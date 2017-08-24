@@ -1,0 +1,22 @@
+<html>
+<head>
+	<script type="text/javascript">		
+		function isSecure()
+		{
+		   return location.protocol == 'https:';
+		}
+		if(isSecure())//comprueba si la conexion es segura
+			alert("Es Seguro");
+		setTimeout(revisaAceptacionServidor, 1000);
+		function revisaAceptacionServidor(){
+			var pedidorHttp = new XMLHttpRequest();
+			pedidorHttp.open('get', "/atentificado");//pregunta si se ha autentificado
+			pedidorHttp.send("");
+			setTimeout(revisaAceptacionServidor, 1000);
+		}
+	</script>
+</head>
+<body>
+	<p>Error al conectar con la BBDD</p>
+</body>
+</html>

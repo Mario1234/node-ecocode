@@ -1,0 +1,43 @@
+<html>
+<head>
+	<script type="text/javascript">		
+		function isSecure()
+		{
+		   return location.protocol == 'https:';
+		}
+		if(isSecure())//comprueba si la conexion es segura
+			alert("Es Seguro");
+			
+		function login() {
+			var nombre=document.getElementById("nombreID").value;
+			var contrasegna=document.getElementById("contrasegnaID").value;
+			var autorizacion=nombre+":"+contrasegna;
+			var autorizacionCodificada = window.btoa(autorizacion);	
+
+			// The rest of this code assumes you are not using a library.
+			// It can be made less wordy if you use one.
+			var form = document.getElementById("pedidorID");
+			form.setAttribute("method", "post");
+			form.setAttribute("action", "/atentifica");
+			
+			var hiddenField = document.createElement("input");
+			hiddenField.setAttribute("type", "hidden");
+			hiddenField.setAttribute("name", 'authorization');
+			hiddenField.setAttribute("value", autorizacionCodificada);
+			form.appendChild(hiddenField);
+
+			document.body.appendChild(form);
+			form.submit();
+		}
+	</script>
+</head>
+<body>
+	<form id="pedidorID">
+		<label>Email</label>
+		<input id="nombreID" type="email" name="usermail" placeholder="yourname@email.com" required>
+		<label>Contrasegna</label>
+		<input id="contrasegnaID" type="password" name="password" placeholder="password" required>
+	</form>
+	<button type="button" onclick="login()">Entrar</button>
+</body>
+</html>

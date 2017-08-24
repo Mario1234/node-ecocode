@@ -1,0 +1,29 @@
+1- Abre la consola de comandos de windows, consola del sistema en modo administrador, esta en inicio->herramientas
+2- Cambia el directorio actual por el directorio de nodejs
+	cd..
+	cd..
+	cd Program Files
+	cd nodejs
+3 - Instala el modulo Sqlite3
+	npm install sqlite3 --save
+4 - Instala el modulo Express
+	npm install express --save
+5 - Instala el modulo parseador de DOM
+	npm install body-parser --save
+6 - listar los modulos que acabamos de instalar, para comprobar que los hemos instalado	
+	npm list --depth=0
+deberiamos ver:
+	body-parser@1.17.2
+	express@4.15.3
+	npm@3.10.10
+	sqlite3@3.1.8
+7 - arbir el explorador de carpetas de windows e ir a la carpeta de nodejs: C:\Program Files\nodejs
+8 - ejecutar node.exe
+9 - Para ejecutar el codigo del tutorial, en la consola de node escribir este comando: 
+	require("./mi_servidor_web");
+en la consola de node se ejecuta el codigo en lenguaje javascript que escribas en ella. Si escribes: console.log("Hello World"); Se escribira una linea debajo poniendo Hello World
+en este caso, le decimos que cargue otro archivo escrito en javascript y lo compile. El archivo es mi_servidor_web.js
+tiene todo el codigo con el que se aprende node en este tutorial
+
+direccion para probar en el navegador:
+https://localhost
