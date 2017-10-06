@@ -27,3 +27,14 @@ tiene todo el codigo con el que se aprende node en este tutorial
 
 direccion para probar en el navegador:
 https://localhost
+
+añadido modulo express-session usando powershell en modo administrador:
+	cd C:\Users\nombreUsuario\Desktop\node-loggintorial
+	./npm install express-session
+	./npm list --depth=0
+		muestra esto:
+		+-- body-parser@1.17.2
+		+-- express@4.15.3
+		+-- express-session@1.15.6
+		+-- npm@3.10.10
+		`-- sqlite3@3.1.8

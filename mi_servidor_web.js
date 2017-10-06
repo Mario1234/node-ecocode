@@ -1,8 +1,5 @@
 ﻿//VARIABLES
 var resultadoLogin = "";
-var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
-var nombre = "John";
-var contrasegna = "Doe";
 
 //FUNCIONES
 
@@ -10,7 +7,8 @@ var contrasegna = "Doe";
 //accede a la base de datos guardada en el archivo "miBaseDatos.db"
 //compara el usuario con los de la consulta y sino lo casa dice que no existe
 //si lo casa compara la contraseña introducida con la de ese registro de la base de datos(el registro casado)
-function autentifica(respuesta) {
+function autentifica(respuesta, nombre, contrasegna) {
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT nombre, contrasegna FROM USUARIOS WHERE nombre='"+nombre+"'";
 	console.log(consultaSQL);
@@ -57,6 +55,56 @@ function autentifica(respuesta) {
 	}	
 }
 
+function dameDatosUsuarioBBDD(respuesta, nombre){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT nombre, contrasegna FROM USUARIOS WHERE nombre='"+nombre+"'";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		var filasDevueltas = 0;
+		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
+		baseDatos.each(consultaSQL, function(err, row) {
+			filasDevueltas++;
+			console.log(row.nombre + ": " + row.contrasegna);
+			if(row.nombre==nombre){
+					encontrado=true;					
+			}			
+			var html_cadena = "<html><head></head><body><p>DATOS</p><p id='idUsuario'>Usuario:"+nombre+"</p><p id='idContrasegna'>Contraseña:"+row.contrasegna+"</p></body></html>";
+			ClaseFs.writeFile(__dirname + "\\datos.html", html_cadena,function(){
+				respuesta.sendFile(__dirname + "\\datos.html");
+			});			
+		}, function(err, rows) {
+			if(filasDevueltas==0){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+			}
+			//responde el resultado de la consulta
+			respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		//deberia de mandarse una pagina de error de conexion con BBDD
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function datosUsuario(peticion,respuesta){
+	var nombre = peticion.session.nombreUsuario;
+	dameDatosUsuarioBBDD(respuesta, nombre);
+}
+
+//elimina la sesion
+function salirCuenta(peticion,respuesta){
+	peticion.session.destroy(function(error1) {
+		if(error1) {
+		 	console.log(error1);
+		} else {
+			respuesta.redirect('/');
+		}
+	});
+}
+
 function cargarLogin(peticion,respuesta){
 	console.log("cargando login");
 	respuesta.sendFile(__dirname+"\\botones.html");
@@ -65,6 +113,8 @@ function cargarLogin(peticion,respuesta){
 //la funcion instanciaExpress.get o post devuelve los objetos peticion de la clase Request y respuesta de la clase Response
 //lee la cabecera con la contraseña y el mail introducidos por el usuario en botones.html, ambos codificados en base64
 function leerDatosLogin(peticion,respuesta){
+	var nombre = "John";
+	var contrasegna = "Doe";
 	console.log("atiende autentifica");	
 	var cabecera=peticion.body.authorization||'';       // cogemos objeto cabecera de peticion
 	console.log(cabecera);
@@ -72,9 +122,11 @@ function leerDatosLogin(peticion,respuesta){
     var autorizacion=new Buffer(sinEspacios, "base64").toString();    // lo convertimos a bas64
     var partes=autorizacion.split(/:/);                          // partimos en el separador :
       nombre=partes[0];
-      contrasegna=partes[1];
+	  contrasegna=partes[1];
+	var sesionPeticion=peticion.session;
+	sesionPeticion.nombreUsuario = nombre;//guarda nombre del usuario en sesion
 	console.log(nombre+":"+contrasegna);
-	autentifica(respuesta);
+	autentifica(respuesta, nombre, contrasegna);
 	//seguramente se llegue aqui sin tener la respuesta de la consulta sql		
 }
 
@@ -82,9 +134,11 @@ function leerDatosLogin(peticion,respuesta){
 var ClaseHttps = require("https");//pedimos la instancia singleton de la Clase HTTPS
 var ClaseFs = require("fs");//para leer archivos del sistema
 var ClaseExpress = require("express");//para establecer certificado ssl
+var ClaseSession = require("express-session");//para utilizar la sesion http
 const parseadorDOM = require('body-parser');
 var instanciaExpress = ClaseExpress();
 instanciaExpress.use(parseadorDOM.urlencoded({ extended: true }));
+instanciaExpress.use(ClaseSession({secret: 'ssshhhhh'}));
 
 //EJECUCION PRINCIPAL DEL SERVIDOR
 
@@ -99,6 +153,8 @@ const opcionesConexion = {
 //Definimos las distintas rutinas de respuesta de cada peticion
 instanciaExpress.get("/",cargarLogin);
 instanciaExpress.post("/atentifica", leerDatosLogin);//si pide autentificarse
+instanciaExpress.get("/logout", salirCuenta);//si pide salir de su cuenta
+instanciaExpress.get("/datos", datosUsuario);//si pide ver sus datos
 
 var servidor = ClaseHttps.createServer(opcionesConexion,instanciaExpress);
 servidor.listen(443);
@@ -106,8 +162,3 @@ var host = servidor.address().address;
 var port = servidor.address().port;
 
 console.log("Servidor HTTPS en "+host+" corriendo en el puerto "+port);
-// instanciaExpress.listen(1900,function () {	
-	
-
-// });
-//servidor.close();
