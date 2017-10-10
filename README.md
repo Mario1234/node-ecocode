@@ -1,5 +1,5 @@
-# node-loggintorial
-Node.js webservice example about online loggin service for learning to use node modules as: express, https(SSL), fs, body-parser and sqlite3.
+# node-ecocode
+Ecosystem darwinist code evolution game that runs into a node js server with login account management
 
 # Install and Debug
 
