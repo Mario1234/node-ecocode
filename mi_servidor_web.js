@@ -7,43 +7,47 @@ var resultadoLogin = "";
 //accede a la base de datos guardada en el archivo "miBaseDatos.db"
 //compara el usuario con los de la consulta y sino lo casa dice que no existe
 //si lo casa compara la contraseña introducida con la de ese registro de la base de datos(el registro casado)
-function autentifica(respuesta, nombre, contrasegna) {
+function autentificaBBDD(peticion, respuesta, nombre, contrasegna) {
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT nombre, contrasegna FROM USUARIOS WHERE nombre='"+nombre+"'";
+	var consultaSQL = "SELECT count(id) as filas, id, nombre, contrasegna FROM USUARIO WHERE nombre=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
-		var filasDevueltas = 0;
-		var encontrado = false;
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
-		baseDatos.each(consultaSQL, function(err, row) {
-			filasDevueltas++;
-			console.log(row.nombre + ": " + row.contrasegna);
-			if(!encontrado){//mientras no encuentre al usuario introducido sigue buscando
-				if(row.nombre==nombre){
-					encontrado=true;
-					if(row.contrasegna==contrasegna){//si caso el usuario se comprueba la contrseña
+		baseDatos.all(consultaSQL, [nombre], function(err, rows) {
+			console.log(rows[0].nombre + ": " + rows[0].contrasegna);
+			if(rows[0].filas>0){//mientras no encuentre al usuario introducido sigue buscando
+				if(rows[0].nombre==nombre){
+					if(rows[0].contrasegna==contrasegna){//si caso el usuario se comprueba la contrseña
 						resultadoLogin="contraseña correcta";
-						dirHTMLrespuesta = "\\cuenta.html";//login exitoso, damos pagina personal
+						peticion.session.idUsuario = rows[0].id;
+						var mensaje=rows[0].nombre;
+						ClaseFs.readFile(__dirname + "\\cuenta.html", 'utf8', function (err,html_cadena) {
+							if (err) {
+							  return console.log(err);
+							}
+							html_cadena = html_cadena.replace(/mensaje1a/g, mensaje);  
+							respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+							respuesta.write(html_cadena);
+							respuesta.end();
+						});	
 					}
 					else{
 						resultadoLogin="contraseña incorrecta";
 						dirHTMLrespuesta = "\\incorrecta.html";//contraseña incorrecta, advertimos con un html
+						respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 					}
 				}
-			}						
-			console.log(resultadoLogin);
-			//responde el resultado de la consulta
-			respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
-		}, function(err, rows) {
-			if(filasDevueltas==0){
+			}	
+			else{
 				resultadoLogin = "no existe ese usuario";
 				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-			}
-			console.log(resultadoLogin);
-			//responde el resultado de la consulta
-			respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				console.log(resultadoLogin);
+				//responde el resultado de la consulta
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+			}					
+			console.log(resultadoLogin);			
 		});	
 	});
 	baseDatos.close();
@@ -55,31 +59,39 @@ function autentifica(respuesta, nombre, contrasegna) {
 	}	
 }
 
-function dameDatosUsuarioBBDD(respuesta, nombre){
+function subeCodigosUsuarioBBDD(respuesta, idUsuario, machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT nombre, contrasegna FROM USUARIOS WHERE nombre='"+nombre+"'";
+	var consultaSQL = "SELECT count(*) as conteo FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
+	var insertSQL = "INSERT INTO CODIGOS_ESPECIE (ID_ESPECIE, CODIGO_MACHO, CODIGO_HEMBRA, CODIGO_MOV_MACHO, CODIGO_MOV_HEMBRA) VALUES (?, ?, ?, ?, ?)";
+	var updateSQL = "UPDATE CODIGOS_ESPECIE SET (CODIGO_MACHO=?, CODIGO_HEMBRA=?, CODIGO_MOV_MACHO=?, CODIGO_MOV_HEMBRA=?) WHERE ID_ESPECIE = ?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
-		var filasDevueltas = 0;
+		var mensaje = "error al subir los codigos";
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
-		baseDatos.each(consultaSQL, function(err, row) {
-			filasDevueltas++;
-			console.log(row.nombre + ": " + row.contrasegna);
-			if(row.nombre==nombre){
-					encontrado=true;					
-			}			
-			var html_cadena = "<html><head></head><body><p>DATOS</p><p id='idUsuario'>Usuario:"+nombre+"</p><p id='idContrasegna'>Contraseña:"+row.contrasegna+"</p></body></html>";
-			ClaseFs.writeFile(__dirname + "\\datos.html", html_cadena,function(){
-				respuesta.sendFile(__dirname + "\\datos.html");
-			});			
-		}, function(err, rows) {
-			if(filasDevueltas==0){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+		baseDatos.all(consultaSQL,[idUsuario], function(err, rows) {
+			if(error){
+				mensaje = "error en la consulta a BBDD";
 			}
-			//responde el resultado de la consulta
-			respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+			else{
+				if(rows[0].conteo>0){
+					baseDatos.run(updateSQL,[machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo,idUsuario]);
+				}
+				else{
+					baseDatos.run(insertSQL,[idUsuario,machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo]);
+				}
+				mensaje="datos subidos con exito";
+			}						
+		});	
+		ClaseFs.readFile(__dirname + "\\cuenta.html", 'utf8', function (err,html_cadena) {
+			if (err) {
+			  return console.log(err);
+			}
+			html_cadena = html_cadena.replace(/mensaje1a/g, mensaje);  
+			respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+			respuesta.write(html_cadena);
+			respuesta.end();
 		});	
 	});
 	baseDatos.close();
@@ -89,9 +101,137 @@ function dameDatosUsuarioBBDD(respuesta, nombre){
 	}	
 }
 
+function dameDatosUsuarioBBDD(respuesta, idUsuario){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT count(nombre) as filas, nombre, contrasegna, codigo_macho, codigo_hembra, codigo_mov_macho, codigo_mov_hembra FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
+		baseDatos.all(consultaSQL, [idUsuario], function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+			}
+			else{
+				var nom = "";var con = "";var codM = "";var codH = "";var codMM = "";var codMH = "";				
+				if(rows[0].filas>0){
+					nom = rows[0].nombre;
+					con = rows[0].contrasegna;
+					codM = rows[0].codigo_macho;
+					codH = rows[0].codigo_hembra;
+					codMM = rows[0].codigo_mov_macho;
+					codMH = rows[0].codigo_mov_hembra;
+				}
+				console.log(nom + ": " + con);
+				ClaseFs.readFile(__dirname + "\\datos.html", 'utf8', function (err2,html_cadena) {
+					if (err2) {
+					  return console.log(err2);
+					}
+					html_cadena = html_cadena.replace(/usuario1a/g, nom);  
+					html_cadena = html_cadena.replace(/contrasegna1a/g, con);  
+					html_cadena = html_cadena.replace(/codigomacho1a/g, codM);  
+					html_cadena = html_cadena.replace(/codigohembra1a/g, codH); 
+					html_cadena = html_cadena.replace(/codigomovmacho1a/g, codMM); 
+					html_cadena = html_cadena.replace(/codigomovhembra1a/g, codMH); 
+					respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+					respuesta.write(html_cadena);
+					respuesta.end();
+				});
+			}			
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		//deberia de mandarse una pagina de error de conexion con BBDD
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function dameListaSimulacionesActivasBBDD(respuesta){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT count(ID_SIMULACION) as filas, ID_SIMULACION FROM SIMULACION WHERE NUMERO_ESPECIES<MAX_NUM_ESPECIES";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
+		baseDatos.all(consultaSQL, function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\errorConexionBBDD.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+			}
+			else{
+				var iniCadenaHTML = "<html><head></head><body><form action='/entrarsimulacion' method='get'>";
+				var finCadenaHTML = "</form><form action='/cuenta' method='get'><button type='submit'>Volver</button></form></body></html>";
+				var listaSimulaciones = "";
+				if(rows[0].filas>0){					
+					listaSimulaciones += "<ul>";
+					rows.forEach(function(row) {
+						listaSimulaciones += "<li><button type='submit' name='"+row.ID_SIMULACION+"'>"+row.ID_SIMULACION+"</button></li>";
+					}, this);
+					listaSimulaciones += "</ul>";
+				}
+				respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+				respuesta.write(iniCadenaHTML+listaSimulaciones+finCadenaHTML);
+				respuesta.end();
+			}
+		});
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function entrarsimulacion(peticion,respuesta){
+	
+}
+
+function listarSimulaciones(peticion,respuesta){		
+	dameListaSimulacionesActivasBBDD(respuesta);
+}
+
+function subirCodigos(peticion,respuesta){
+	var idUsuario = peticion.session.idUsuario;
+	var machoCodigo=peticion.body.machoCodigo;
+	var hembraCodigo=peticion.body.hembraCodigo;
+	var movMachoCodigo=peticion.body.movMachoCodigo;
+	var movHembraCodigo=peticion.body.movHembraCodigo;
+	subeCodigosUsuarioBBDD(respuesta,idUsuario,machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo);
+	// console.log("machoCodigo");
+	// console.log(machoCodigo);
+	// console.log("hembraCodigo");
+	// console.log(hembraCodigo);
+	// console.log("movMachoCodigo");
+	// console.log(movMachoCodigo);
+	// console.log("movHembraCodigo");
+	// console.log(movHembraCodigo);
+	respuesta.sendFile(__dirname+"\\cuenta.html");
+}
+
+function menuCuenta(peticion,respuesta){
+	var idUsuario = peticion.session.idUsuario;
+	ClaseFs.readFile(__dirname + "\\cuenta.html", 'utf8', function (err,html_cadena) {
+		if (err) {
+		  return console.log(err);
+		}
+		html_cadena = html_cadena.replace(/mensaje1a/g, "");  
+		respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+		respuesta.write(html_cadena);
+		respuesta.end();
+	});	
+}
+
+function editarCodigos(peticion,respuesta){
+	var idUsuario = peticion.session.idUsuario;
+	respuesta.sendFile(__dirname+"\\editorCodigos.html");
+}
+
 function datosUsuario(peticion,respuesta){
-	var nombre = peticion.session.nombreUsuario;
-	dameDatosUsuarioBBDD(respuesta, nombre);
+	var idUsuario = peticion.session.idUsuario;
+	dameDatosUsuarioBBDD(respuesta, idUsuario);
 }
 
 //elimina la sesion
@@ -126,7 +266,7 @@ function leerDatosLogin(peticion,respuesta){
 	var sesionPeticion=peticion.session;
 	sesionPeticion.nombreUsuario = nombre;//guarda nombre del usuario en sesion
 	console.log(nombre+":"+contrasegna);
-	autentifica(respuesta, nombre, contrasegna);
+	autentificaBBDD(peticion, respuesta, nombre, contrasegna);
 	//seguramente se llegue aqui sin tener la respuesta de la consulta sql		
 }
 
@@ -155,6 +295,11 @@ instanciaExpress.get("/",cargarLogin);
 instanciaExpress.post("/atentifica", leerDatosLogin);//si pide autentificarse
 instanciaExpress.get("/logout", salirCuenta);//si pide salir de su cuenta
 instanciaExpress.get("/datos", datosUsuario);//si pide ver sus datos
+instanciaExpress.get("/editarcodigos", editarCodigos);//si pide editar sus codigos de especie
+instanciaExpress.post("/subecodigos", subirCodigos);//si pide subir sus codigos de especie recien editados
+instanciaExpress.get("/cuenta", menuCuenta);//si pide volver a menu de cuenta
+instanciaExpress.get("/listasimulaciones", listarSimulaciones);//si pide la lista de simulaciones activas actuales
+instanciaExpress.get("/entrarsimulacion",entrarsimulacion);//si pide entrar a una simulacion activa de la lista
 
 var servidor = ClaseHttps.createServer(opcionesConexion,instanciaExpress);
 servidor.listen(443);
