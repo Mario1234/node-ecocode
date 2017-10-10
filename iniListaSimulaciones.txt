@@ -1,0 +1,16 @@
+<html>
+<head>
+</head>
+<body>
+    <script>
+        function guardaPulsado(pulsado){
+            var formulario = document.getElementById('idEntrarSimulacionForm');
+            var escondido = document.getElementById('idPulsado');
+            escondido.value=pulsado; 
+            formulario.submit();
+        }
+    </script>    
+    <form id='idEntrarSimulacionForm' action='/entrarsimulacion' method='post'>       
+        <input type='hidden' id='idPulsado' name='namePulsado'/> 
+    </form>
+    

@@ -59,6 +59,10 @@ function autentificaBBDD(peticion, respuesta, nombre, contrasegna) {
 	}	
 }
 
+function dameTableroInicial(){
+	return {};
+}
+
 function subeCodigosUsuarioBBDD(respuesta, idUsuario, machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
@@ -149,6 +153,19 @@ function dameDatosUsuarioBBDD(respuesta, idUsuario){
 	}	
 }
 
+function leeRetrollamada(err2,html_cadena) {
+	if (err2) {
+		console.log(err2);
+	}
+	return html_cadena;
+}
+function leeRetrollamada2(err2,html_cadena) {
+	if (err2) {
+		console.log(err2);
+	}
+	return html_cadena;
+}
+
 function dameListaSimulacionesActivasBBDD(respuesta){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
 	var sqlite3 = require("sqlite3").verbose();
@@ -163,19 +180,40 @@ function dameListaSimulacionesActivasBBDD(respuesta){
 				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 			}
 			else{
-				var iniCadenaHTML = "<html><head></head><body><form action='/entrarsimulacion' method='get'>";
-				var finCadenaHTML = "</form><form action='/cuenta' method='get'><button type='submit'>Volver</button></form></body></html>";
-				var listaSimulaciones = "";
-				if(rows[0].filas>0){					
-					listaSimulaciones += "<ul>";
-					rows.forEach(function(row) {
-						listaSimulaciones += "<li><button type='submit' name='"+row.ID_SIMULACION+"'>"+row.ID_SIMULACION+"</button></li>";
-					}, this);
-					listaSimulaciones += "</ul>";
-				}
-				respuesta.writeHead(200, { 'Content-Type': 'text/html' });
-				respuesta.write(iniCadenaHTML+listaSimulaciones+finCadenaHTML);
-				respuesta.end();
+				var iniCadenaHTML = "<html><head></head><body>";
+				var finCadenaHTML = "</body></html>";
+				
+				ClaseAsync.parallel([
+					// esto se ejecuta en paralelo porque no depende de ningun otro proceso
+					function(leeRetrollamada) {
+						ClaseFs.readFile(__dirname + "\\iniListaSimulaciones.txt", 'utf8', leeRetrollamada);
+					},
+					//esto se ejecuta en paralelo tambien
+					function(leeRetrollamada2) {
+						ClaseFs.readFile(__dirname + "\\finListaSimulaciones.txt", 'utf8', leeRetrollamada2);
+					}
+					],
+					function(err2, resultadosRetrollamadas) {
+						if(err2){
+							console.log(err2);
+						}
+						else{
+							iniCadenaHTML = resultadosRetrollamadas[0];
+							finCadenaHTML = resultadosRetrollamadas[1];
+							var listaSimulaciones = "";
+							if(rows[0].filas>0){					
+								listaSimulaciones += "<ul>";
+								rows.forEach(function(row) {
+									listaSimulaciones += "<li><button onclick=guardaPulsado('"+row.ID_SIMULACION+"')>"+row.ID_SIMULACION+"</button></li>";
+								}, this);
+								listaSimulaciones += "</ul>";
+							}
+							respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+							respuesta.write(iniCadenaHTML+listaSimulaciones+finCadenaHTML);
+							respuesta.end();
+						}						
+					}
+				);//fin del paralelismo  			
 			}
 		});
 	});
@@ -185,8 +223,78 @@ function dameListaSimulacionesActivasBBDD(respuesta){
 	}	
 }
 
+function dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
+	var sqlite3 = require("sqlite3").verbose();
+	var insertSQL = "INSERT INTO PASO_SIMULACION (ID_SIMULACION, PASO, ID_ESPECIE, TABLERO) VALUES (?, ?, ?, ?)";
+	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, ID_ESPECIE, nombre, PREPARADO FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id WHERE ID_SIMULACION=?";
+	var consulta2SQL = "SELECT count(ID_ESPECIE) as filas, ID_ESPECIE FROM PASO_SIMULACION WHERE ID_SIMULACION=? AND ID_ESPECIE=?";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	//crea el paso0 para el jugador que se acaba de unir
+	ClaseAsync.series([function(retroLlama){
+		var sentencia;
+		baseDatos.all(consulta2SQL,[idSimulacion, idUsuario], function(err1, rows) {
+			if(err1){
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+			}
+			else{
+				if(rows[0].filas>0){
+					respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				}
+				else{
+					baseDatos.run(insertSQL,[idSimulacion,0,idUsuario,'vacio']);
+				}				
+			}	
+			retroLlama();		
+		});
+	}],function (err, resultados){
+		//consigue la lista de jugadores 
+		baseDatos.all(consultaSQL,[idSimulacion], function(err1, rows) {
+			if(err1){
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+			}
+			else{
+				if(rows[0].filas>0){
+					var listaEspecies = "<ul>";
+					rows.forEach(function(row) {
+						var preparado="esperando...";
+						if(row.PREPARADO==1){
+							preparado="Listo";
+						}
+						listaEspecies += "<li><p>"+row.nombre+": "+preparado+"</p></li>";
+					}, this);
+					listaEspecies += "</ul>";
+					ClaseFs.readFile(__dirname + "\\simulacionIni.html", 'utf8', function (err2,html_cadena) {
+						if (err2) {
+							return console.log(err2);
+						}
+						else{
+							html_cadena =html_cadena.replace(/listaespecies1a/g, listaEspecies);
+							respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+							respuesta.write(html_cadena);
+							respuesta.end();
+						}
+					});
+				}	
+				else{
+					respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto					
+				}				
+			}
+			baseDatos.close();
+		});
+	});
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
 function entrarsimulacion(peticion,respuesta){
-	
+	var cadenaIdSimulacion = peticion.body.namePulsado;
+	peticion.session.idSimulacion = parseInt(cadenaIdSimulacion);
+	var idSimulacion = peticion.session.idSimulacion;
+	var idUsuario = peticion.session.idUsuario;
+	dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario);
 }
 
 function listarSimulaciones(peticion,respuesta){		
@@ -275,6 +383,7 @@ var ClaseHttps = require("https");//pedimos la instancia singleton de la Clase H
 var ClaseFs = require("fs");//para leer archivos del sistema
 var ClaseExpress = require("express");//para establecer certificado ssl
 var ClaseSession = require("express-session");//para utilizar la sesion http
+var ClaseAsync = require("async");//para trabajar con semaforos de procesos asincronos
 const parseadorDOM = require('body-parser');
 var instanciaExpress = ClaseExpress();
 instanciaExpress.use(parseadorDOM.urlencoded({ extended: true }));
@@ -291,6 +400,7 @@ const opcionesConexion = {
 };
 
 //Definimos las distintas rutinas de respuesta de cada peticion
+//las peticiones que suben datos al servidor es obligatorio hacerlas con POST
 instanciaExpress.get("/",cargarLogin);
 instanciaExpress.post("/atentifica", leerDatosLogin);//si pide autentificarse
 instanciaExpress.get("/logout", salirCuenta);//si pide salir de su cuenta
@@ -299,7 +409,7 @@ instanciaExpress.get("/editarcodigos", editarCodigos);//si pide editar sus codig
 instanciaExpress.post("/subecodigos", subirCodigos);//si pide subir sus codigos de especie recien editados
 instanciaExpress.get("/cuenta", menuCuenta);//si pide volver a menu de cuenta
 instanciaExpress.get("/listasimulaciones", listarSimulaciones);//si pide la lista de simulaciones activas actuales
-instanciaExpress.get("/entrarsimulacion",entrarsimulacion);//si pide entrar a una simulacion activa de la lista
+instanciaExpress.post("/entrarsimulacion",entrarsimulacion);//si pide entrar a una simulacion activa de la lista
 
 var servidor = ClaseHttps.createServer(opcionesConexion,instanciaExpress);
 servidor.listen(443);
