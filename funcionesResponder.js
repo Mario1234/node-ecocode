@@ -36,14 +36,17 @@ var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta,
 	enviaCadenaHTML(respuesta,machosHTML);
 }
 
-var enviaCuenta = module.exports.enviaCuenta = function(err,html_cadena) {
+var enviaMensaje = module.exports.enviaMensaje = function(err,html_cadena) {
     if (err) {
       console.log(err);
       html_cadena = html_cadena.replace(/mensaje1a/g, err);  
     }
+    else if(this.mensaje){
+        html_cadena = html_cadena.replace(/mensaje1a/g, this.mensaje); 
+    }
     else{
-        html_cadena = html_cadena.replace(/mensaje1a/g, "");  
-    }    
+        html_cadena = html_cadena.replace(/mensaje1a/g, ""); 
+    }
     enviaCadenaHTML(this.respuesta,html_cadena);
 }
 

@@ -138,12 +138,12 @@ var subirCodigos = module.exports.subirCodigos = function(peticion,respuesta){
 	// console.log(machoCodigo);
 	// console.log("hembraCodigo");
     // console.log(hembraCodigo);
-    funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaCuenta.bind({respuesta: respuesta}));
+    funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta}));
 }
 
 var menuCuenta = module.exports.menuCuenta = function(peticion,respuesta){
 	var idUsuario = peticion.session.idUsuario;
-	funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaCuenta.bind({respuesta: respuesta}));
+	funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta}));
 }
 
 var editarCodigos = module.exports.editarCodigos = function(peticion,respuesta){
@@ -169,7 +169,7 @@ var salirCuenta = module.exports.salirCuenta = function(peticion,respuesta){
 
 var cargarLogin = module.exports.cargarLogin = function(peticion,respuesta){
 	console.log("cargando login");
-	respuesta.sendFile(__dirname+"\\botones.html");
+	funcionesArchivos.leeArchivo(__dirname + "\\botones.html",fr.enviaMensaje.bind({respuesta: respuesta, mensaje:""}));
 }
 
 //la funcion instanciaExpress.get o post devuelve los objetos peticion de la clase Request y respuesta de la clase Response

@@ -26,31 +26,27 @@ var autentificaBBDD = module.exports.autentificaBBDD = function(peticion, respue
 						resultadoLogin="contraseña correcta";
 						peticion.session.idUsuario = rows[0].id;
                         var mensaje=rows[0].nombre;
-                        funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaCuenta.bind({respuesta: respuesta}));
+                        funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:resultadoLogin}));
 					}
 					else{
-						resultadoLogin="contraseña incorrecta";
-						dirHTMLrespuesta = "\\incorrecta.html";//contraseña incorrecta, advertimos con un html
-						respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+                        resultadoLogin="contraseña incorrecta";
+                        funcionesArchivos.leeArchivo(__dirname + "\\botones.html",fr.enviaMensaje.bind({respuesta: respuesta, mensaje:resultadoLogin}));
 					}
 				}
 			}	
 			else{
-				resultadoLogin = "no existe ese usuario";
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+                resultadoLogin = "no existe ese usuario";
+                funcionesArchivos.leeArchivo(__dirname + "\\botones.html",fr.enviaMensaje.bind({respuesta: respuesta, mensaje:resultadoLogin}));
 				console.log(resultadoLogin);
-				//responde el resultado de la consulta
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 			}					
 			console.log(resultadoLogin);			
 		});	
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		resultadoLogin = "error al conectar con BBDD";
+        resultadoLogin = "error al conectar con BBDD";
+        funcionesArchivos.leeArchivo(__dirname + "\\botones.html",fr.enviaMensaje.bind({respuesta: respuesta, mensaje:resultadoLogin}));
 		console.log(resultadoLogin);
-		//deberia de mandarse una pagina de error de conexion con BBDD
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 	}	
 }
 
@@ -61,13 +57,13 @@ var subeCodigosUsuarioBBDD = module.exports.subeCodigosUsuarioBBDD = function(re
 	var insertSQL = "INSERT INTO CODIGOS_ESPECIE (ID_ESPECIE, CODIGO_MACHO, CODIGO_HEMBRA) VALUES (?, ?, ?)";
 	var updateSQL = "UPDATE CODIGOS_ESPECIE SET (CODIGO_MACHO=?, CODIGO_HEMBRA=?) WHERE ID_ESPECIE = ?";
 	console.log(consultaSQL);
-	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+    var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+    var mensaje = "error al subir los codigos";
 	baseDatos.serialize(function() {
-		var mensaje = "error al subir los codigos";
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL,[idUsuario], function(err, rows) {
 			if(error){
-				mensaje = "error en la consulta a BBDD";
+				mensaje = error;
 			}
 			else{
 				if(rows[0].conteo>0){
@@ -79,12 +75,12 @@ var subeCodigosUsuarioBBDD = module.exports.subeCodigosUsuarioBBDD = function(re
 				mensaje="datos subidos con exito";
 			}						
 		});	
-		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaCuenta.bind({respuesta: respuesta}));
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:mensaje}));
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		//deberia de mandarse una pagina de error de conexion con BBDD
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+        mensaje = "error al conectar con BBDD";
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:mensaje}));
 	}	
 }
 
@@ -98,8 +94,7 @@ var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respue
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, [idUsuario], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
 				var nom = "";var con = "";var codM = "";var codH = "";			
@@ -116,8 +111,7 @@ var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respue
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		//deberia de mandarse una pagina de error de conexion con BBDD
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -138,8 +132,7 @@ var dameListaSimulacionesActivasBBDD = module.exports.dameListaSimulacionesActiv
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\errorConexionBBDD.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
 				var iniCadenaHTML = "<html><head></head><body>";
@@ -164,7 +157,7 @@ var dameListaSimulacionesActivasBBDD = module.exports.dameListaSimulacionesActiv
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -183,7 +176,7 @@ var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacion
 		var sentencia;
 		baseDatos.all(consulta2SQL,[idSimulacion, idUsuario], function(err1, rows) {
 			if(err1){
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
 				if(rows[0].filas<=0){
@@ -197,7 +190,7 @@ var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacion
 		//consigue la lista de jugadores 
 		baseDatos.all(consultaSQL,[idSimulacion], function(err1, rows) {
 			if(err1){
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
 				if(rows[0].filas>0){
@@ -213,16 +206,18 @@ var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacion
                     funcionesArchivos.leeArchivo( __dirname + "\\simulacionIni.html", fr.enviaListaEspeciesSimulacion.bind({respuesta: respuesta, listaEspecies:listaEspecies}) );                    
 				}	
 				else{
-					respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto					
+					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error lista jugadores"}));				
 				}				
 			}
 			baseDatos.close();
 		});
 	});
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
+
+//arreglar devolucion, deben ser retrollamadas
 var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuesta, idUsuario){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
@@ -233,8 +228,7 @@ var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuest
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.run(updateSQL, [1,idUsuario], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return false;
 			}
 			else{
@@ -244,7 +238,7 @@ var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuest
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -258,8 +252,7 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return false;
 			}
 			else{
@@ -271,7 +264,7 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -285,8 +278,7 @@ var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(id
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, [idUsuario], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return "";
 			}
 			else{
@@ -301,7 +293,7 @@ var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(id
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -314,8 +306,7 @@ var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return "";
 			}
 			else{
@@ -339,7 +330,7 @@ var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -352,8 +343,7 @@ var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = functio
 	baseDatos.serialize(function() {
 		baseDatos.all(updateSQL, [nuevosCodigosEspecie[0],nuevosCodigosEspecie[1],idSimulacion, idUsuario, paso], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return false;
 			}
 			else{
@@ -363,7 +353,7 @@ var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = functio
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
@@ -376,8 +366,7 @@ var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = functio
 	baseDatos.serialize(function() {
 		baseDatos.all(updateSQL, [tablero, 1, idSimulacion, idUsuario, paso], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return false;
 			}
 			else{
@@ -387,7 +376,7 @@ var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = functio
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
 }
 
@@ -400,8 +389,7 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario, paso], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return null;
 			}
 			else{
@@ -414,7 +402,7 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
 }
 
@@ -429,8 +417,7 @@ var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimula
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario, paso], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return [codMach,codHemb];
 			}
 			else{
@@ -445,7 +432,7 @@ var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimula
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
 }
 
@@ -459,8 +446,7 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return fase;
 			}
 			else{
@@ -473,7 +459,7 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
 }
 
@@ -487,8 +473,7 @@ var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(id
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
 			if(err1){
-				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
-				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return paso;
 			}
 			else{
@@ -501,6 +486,6 @@ var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(id
 	});
 	baseDatos.close();
 	if(baseDatos==null){
-		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
 }
