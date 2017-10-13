@@ -63,12 +63,12 @@ function dameTableroInicial(){
 	return {};
 }
 
-function subeCodigosUsuarioBBDD(respuesta, idUsuario, machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo){
+function subeCodigosUsuarioBBDD(respuesta, idUsuario, machoCodigo,hembraCodigo){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT count(*) as conteo FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
-	var insertSQL = "INSERT INTO CODIGOS_ESPECIE (ID_ESPECIE, CODIGO_MACHO, CODIGO_HEMBRA, CODIGO_MOV_MACHO, CODIGO_MOV_HEMBRA) VALUES (?, ?, ?, ?, ?)";
-	var updateSQL = "UPDATE CODIGOS_ESPECIE SET (CODIGO_MACHO=?, CODIGO_HEMBRA=?, CODIGO_MOV_MACHO=?, CODIGO_MOV_HEMBRA=?) WHERE ID_ESPECIE = ?";
+	var insertSQL = "INSERT INTO CODIGOS_ESPECIE (ID_ESPECIE, CODIGO_MACHO, CODIGO_HEMBRA) VALUES (?, ?, ?, ?, ?)";
+	var updateSQL = "UPDATE CODIGOS_ESPECIE SET (CODIGO_MACHO=?, CODIGO_HEMBRA=?) WHERE ID_ESPECIE = ?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -80,10 +80,10 @@ function subeCodigosUsuarioBBDD(respuesta, idUsuario, machoCodigo,hembraCodigo,m
 			}
 			else{
 				if(rows[0].conteo>0){
-					baseDatos.run(updateSQL,[machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo,idUsuario]);
+					baseDatos.run(updateSQL,[machoCodigo,hembraCodigo,idUsuario]);
 				}
 				else{
-					baseDatos.run(insertSQL,[idUsuario,machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo]);
+					baseDatos.run(insertSQL,[idUsuario,machoCodigo,hembraCodigo]);
 				}
 				mensaje="datos subidos con exito";
 			}						
@@ -108,7 +108,7 @@ function subeCodigosUsuarioBBDD(respuesta, idUsuario, machoCodigo,hembraCodigo,m
 function dameDatosUsuarioBBDD(respuesta, idUsuario){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(nombre) as filas, nombre, contrasegna, codigo_macho, codigo_hembra, codigo_mov_macho, codigo_mov_hembra FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
+	var consultaSQL = "SELECT count(nombre) as filas, nombre, contrasegna, codigo_macho, codigo_hembra FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -119,14 +119,12 @@ function dameDatosUsuarioBBDD(respuesta, idUsuario){
 				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 			}
 			else{
-				var nom = "";var con = "";var codM = "";var codH = "";var codMM = "";var codMH = "";				
+				var nom = "";var con = "";var codM = "";var codH = "";			
 				if(rows[0].filas>0){
 					nom = rows[0].nombre;
 					con = rows[0].contrasegna;
 					codM = rows[0].codigo_macho;
 					codH = rows[0].codigo_hembra;
-					codMM = rows[0].codigo_mov_macho;
-					codMH = rows[0].codigo_mov_hembra;
 				}
 				console.log(nom + ": " + con);
 				ClaseFs.readFile(__dirname + "\\datos.html", 'utf8', function (err2,html_cadena) {
@@ -137,8 +135,6 @@ function dameDatosUsuarioBBDD(respuesta, idUsuario){
 					html_cadena = html_cadena.replace(/contrasegna1a/g, con);  
 					html_cadena = html_cadena.replace(/codigomacho1a/g, codM);  
 					html_cadena = html_cadena.replace(/codigohembra1a/g, codH); 
-					html_cadena = html_cadena.replace(/codigomovmacho1a/g, codMM); 
-					html_cadena = html_cadena.replace(/codigomovhembra1a/g, codMH); 
 					respuesta.writeHead(200, { 'Content-Type': 'text/html' });
 					respuesta.write(html_cadena);
 					respuesta.end();
@@ -154,12 +150,6 @@ function dameDatosUsuarioBBDD(respuesta, idUsuario){
 }
 
 function leeRetrollamada(err2,html_cadena) {
-	if (err2) {
-		console.log(err2);
-	}
-	return html_cadena;
-}
-function leeRetrollamada2(err2,html_cadena) {
 	if (err2) {
 		console.log(err2);
 	}
@@ -189,8 +179,8 @@ function dameListaSimulacionesActivasBBDD(respuesta){
 						ClaseFs.readFile(__dirname + "\\iniListaSimulaciones.txt", 'utf8', leeRetrollamada);
 					},
 					//esto se ejecuta en paralelo tambien
-					function(leeRetrollamada2) {
-						ClaseFs.readFile(__dirname + "\\finListaSimulaciones.txt", 'utf8', leeRetrollamada2);
+					function(leeRetrollamada) {
+						ClaseFs.readFile(__dirname + "\\finListaSimulaciones.txt", 'utf8', leeRetrollamada);
 					}
 					],
 					function(err2, resultadosRetrollamadas) {
@@ -223,6 +213,7 @@ function dameListaSimulacionesActivasBBDD(respuesta){
 	}	
 }
 
+//recomendacion: usar insert ignoer en vez de select y luego insert
 function dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
 	var sqlite3 = require("sqlite3").verbose();
@@ -239,10 +230,8 @@ function dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario){
 				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 			}
 			else{
-				if(rows[0].filas>0){
-					respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
-				}
-				else{
+				if(rows[0].filas<=0){
+					//insert si no existe, despues de haber hecho el select
 					baseDatos.run(insertSQL,[idSimulacion,0,idUsuario,'vacio']);
 				}				
 			}	
@@ -288,10 +277,208 @@ function dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario){
 		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
 	}	
 }
+function marcarPreparadoBBDD(respuesta, idUsuario){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var updateSQL = "UPDATE USUARIO SET PREPARADO=? WHERE id=?";
+	console.log(updateSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
+		baseDatos.run(updateSQL, [1,idUsuario], function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				return false;
+			}
+			else{
+				return true;
+			}						
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
 
-function entrarsimulacion(peticion,respuesta){
+function miraSiEmpiezaSimulacionBBDD(idSimulacion){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, MAX_NUM_ESPECIES FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION=PASO_SIMULACION.ID_SIMULACION WHERE SIMULACION.ID_SIMULACION=? AND PREPARADO=1";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
+		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				return false;
+			}
+			else{
+				if(rows[0].filas==rows[0].MAX_NUM_ESPECIES){
+					return true;
+				}
+			}						
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function dameCodigosEspecieBBDD(idUsuario){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, CODIGO_MACHO, CODIGO_HEMBRA FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
+		baseDatos.all(consultaSQL, [idUsuario], function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				return "";
+			}
+			else{
+				if(rows[0].filas==1){
+					var listaCodigosEspecies;
+					listaCodigosEspecies[0]=rows[0].CODIGO_MACHO;
+					listaCodigosEspecies[1]=rows[0].CODIGO_HEMBRA;
+					return listaCodigosEspecies;
+				}
+			}						
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function dameHembrasEspecieBBDD(idSimulacion, idUsuario){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT count(TABLERO) as filas, TABLERO FROM PASO_SIMULACION INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION AND SIMULACION.PASO=PASO_SIMULACION.PASO WHERE SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=?";
+	console.log(consultaSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		baseDatos.all(consultaSQL, [idSimulacion, idUsuario], function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				return "";
+			}
+			else{
+				if(rows[0].filas==1){
+					var tablero = JSON.parse(rows[0].TABLERO);
+					var hembras;
+					var individuos = tablero.individuos;
+					var i;
+					var j=0;
+					for(i=0;i<individuos.length;i++){
+						var individuo=individuos[i];
+						if(individuo.sexo=="H" && individuo.especie==idUsuario){
+							hembras[j]=individuo;
+							j++;
+						}
+					}
+					return hembras;
+				}
+			}						
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function actualizaCodigosPasoBBDD(idSimulacion, idUsuario, paso, nuevosCodigosEspecie){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
+	var sqlite3 = require("sqlite3").verbose();
+	var updateSQL = "UPDATE PASO_SIMULACION SET(CODIGO_MACHO=?,CODIGO_HEMBRA=?) WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
+	console.log(updateSQL);
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
+	baseDatos.serialize(function() {
+		baseDatos.all(updateSQL, [nuevosCodigosEspecie[0],nuevosCodigosEspecie[1],idSimulacion, idUsuario, paso], function(err1, rows) {
+			if(err1){
+				dirHTMLrespuesta = "\\noexiste.html";//usuario no existe, advertimos con un html
+				respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+				return "";
+			}
+			else{
+			}
+		});	
+	});
+	baseDatos.close();
+	if(baseDatos==null){
+		respuesta.sendFile(__dirname + dirHTMLrespuesta);//direccionamiento absoluto
+	}	
+}
+
+function enviaSemillasHembras(respuesta, idSimulacion, idUsuario){
+	var codigosEspecie = dameCodigosEspecieBBDD(idUsuario);
+	var iniHembras = "<html><head></head><body><script>";
+	var hembrasHTML = iniHembras+codigosEspecie[1]+"</script><form id='idDecisionHembrasForm' action='/decisionhembras' method='post'>";
+	hembrasHTML+="<input type='hidden' id='idCodigoMacho' name='nameCodigoMacho' value='"+codigosEspecie[0]+"'>";
+	hembrasHTML+="<input type='hidden' id='idCodigoHembra' name='nameCodigoHembra' value='"+codigosEspecie[1]+"'>";
+	hembrasHTML+="<ul id='idHembras'>";
+	var hembras = dameHembrasEspecieBBDD(idSimulacion, idUsuario);
+	var i;
+	for(i=0;i<hembras.length;i++){
+		//manda la decision de aceptar semilla como no aceptar por defecto
+		hembrasHTML+="<li><input type='hidden' id='"+hembras[i].id+"' name='"+hembras[i].id+"' value='{'movimiento':'NO','decision':'N'}'>"+hembras[i].semilla+"</li>";
+	};
+	hembrasHTML+="</ul></form></body></html>";
+	respuesta.writeHead(200, { 'Content-Type': 'text/html' });
+	respuesta.write(hembrasHTML);
+	respuesta.end();
+}
+
+function decisionHembras(peticion,respuesta){
+	var idUsuario = peticion.session.idUsuario;
+	var idSimulacion = peticion.session.idSimulacion;
+	var hembras = dameHembrasEspecieBBDD(idSimulacion, idUsuario);
+	var respuestasHembras;
+	var i;
+	for(i=0;i<hembras.length;i++){
+		respuestasHembras[i]=peticion.body[""+hembras[i].id];
+	}
+	var nuevosCodigosEspecie;
+	nuevosCodigosEspecie[0]=peticion.body.nameCodigoMacho;
+	nuevosCodigosEspecie[1]=peticion.body.nameCodigoHembra;
+	nuevosCodigosEspecie[2]=peticion.body.nameCodigoMovMacho;
+	nuevosCodigosEspecie[3]=peticion.body.nameCodigoMovHembra;
+	actualizaCodigosPasoBBDD(idSimulacion, idUsuario, nuevosCodigosEspecie);
+
+}
+
+function actualizaListaEspecies(peticion,respuesta){
+	var idUsuario = peticion.session.idUsuario;
+	var idSimulacion = peticion.session.idSimulacion;
+	if(!miraSiEmpiezaSimulacionBBDD(idSimulacion)){
+		dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario);
+	}	
+	else{
+		enviaSemillasHembras(respuesta, idSimulacion, idUsuario);	
+	}
+}
+
+function marcarPreparado(peticion,respuesta){
+	var idUsuario = peticion.session.idUsuario;
+	var idSimulacion = peticion.session.idSimulacion;
+	marcarPreparadoBBDD(respuesta, idUsuario);
+	//dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario);
+}
+
+function entrarSimulacion(peticion,respuesta){
 	var cadenaIdSimulacion = peticion.body.namePulsado;
 	peticion.session.idSimulacion = parseInt(cadenaIdSimulacion);
+	peticion.session.paso=0;
 	var idSimulacion = peticion.session.idSimulacion;
 	var idUsuario = peticion.session.idUsuario;
 	dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario);
@@ -305,9 +492,7 @@ function subirCodigos(peticion,respuesta){
 	var idUsuario = peticion.session.idUsuario;
 	var machoCodigo=peticion.body.machoCodigo;
 	var hembraCodigo=peticion.body.hembraCodigo;
-	var movMachoCodigo=peticion.body.movMachoCodigo;
-	var movHembraCodigo=peticion.body.movHembraCodigo;
-	subeCodigosUsuarioBBDD(respuesta,idUsuario,machoCodigo,hembraCodigo,movMachoCodigo,movHembraCodigo);
+	subeCodigosUsuarioBBDD(respuesta,idUsuario,machoCodigo,hembraCodigo);
 	// console.log("machoCodigo");
 	// console.log(machoCodigo);
 	// console.log("hembraCodigo");
@@ -409,7 +594,10 @@ instanciaExpress.get("/editarcodigos", editarCodigos);//si pide editar sus codig
 instanciaExpress.post("/subecodigos", subirCodigos);//si pide subir sus codigos de especie recien editados
 instanciaExpress.get("/cuenta", menuCuenta);//si pide volver a menu de cuenta
 instanciaExpress.get("/listasimulaciones", listarSimulaciones);//si pide la lista de simulaciones activas actuales
-instanciaExpress.post("/entrarsimulacion",entrarsimulacion);//si pide entrar a una simulacion activa de la lista
+instanciaExpress.post("/entrarsimulacion",entrarSimulacion);//si pide entrar a una simulacion activa de la lista
+instanciaExpress.get("/preparado",marcarPreparado);//pide pasar a estado preparado, para comenzar la simulacion en cuanto esten todos
+instanciaExpress.get("/actualizalistaespecies",actualizaListaEspecies);//si el temporizador se activa y pide refesco de lista jugadores de la simulacion
+instanciaExpress.get("/decisionhembras",decisionHembras);//si envia las decisiones y movs de las hembras y codigos evolucionados, se le devuelve la fase de los machos
 
 var servidor = ClaseHttps.createServer(opcionesConexion,instanciaExpress);
 servidor.listen(443);
