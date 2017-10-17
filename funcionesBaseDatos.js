@@ -217,7 +217,6 @@ var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacion
 	}	
 }
 
-//arreglar devolucion, deben ser retrollamadas
 var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuesta, idUsuario){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
@@ -242,7 +241,7 @@ var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuest
 	}	
 }
 
-var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = function(idSimulacion){
+var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = function(idSimulacion,retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, MAX_NUM_ESPECIES FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION=PASO_SIMULACION.ID_SIMULACION WHERE SIMULACION.ID_SIMULACION=? AND PREPARADO=1";
@@ -251,15 +250,16 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 	baseDatos.serialize(function() {
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
+			var empieza = false;
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return false;
 			}
 			else{
 				if(rows[0].filas==rows[0].MAX_NUM_ESPECIES){
-					return true;
+					empieza=true;
 				}
-			}						
+			}			
+			retrollamada(null,empieza);			
 		});	
 	});
 	baseDatos.close();
@@ -268,27 +268,25 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 	}	
 }
 
-var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(idUsuario){
+var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(idUsuario,retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, CODIGO_MACHO, CODIGO_HEMBRA FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
-		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, [idUsuario], function(err1, rows) {
+			var listaCodigosEspecie={};
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return "";
 			}
 			else{
-				if(rows[0].filas==1){
-					var listaCodigosEspecies;
-					listaCodigosEspecies[0]=rows[0].CODIGO_MACHO;
-					listaCodigosEspecies[1]=rows[0].CODIGO_HEMBRA;
-					return listaCodigosEspecies;
+				if(rows[0].filas==1){					
+					listaCodigosEspecie[0]=rows[0].CODIGO_MACHO;
+					listaCodigosEspecie[1]=rows[0].CODIGO_HEMBRA;
 				}
-			}						
+			}		
+			retrollamada(null, listaCodigosEspecie);			
 		});	
 	});
 	baseDatos.close();
@@ -297,7 +295,7 @@ var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(id
 	}	
 }
 
-var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD = function(idSimulacion, idUsuario, sexo){
+var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD = function(idSimulacion, idUsuario, sexo, retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT count(TABLERO) as filas, TABLERO FROM PASO_SIMULACION INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION AND SIMULACION.PASO=PASO_SIMULACION.PASO WHERE SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=?";
@@ -305,27 +303,27 @@ var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario], function(err1, rows) {
+			var indivaux={};
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return "";
 			}
 			else{
 				if(rows[0].filas==1){
 					var tablero = JSON.parse(rows[0].TABLERO);
-					var hembras;
+					indivaux
 					var individuos = tablero.individuos;
 					var i;
 					var j=0;
 					for(i=0;i<individuos.length;i++){
 						var individuo=individuos[i];
 						if(individuo.sexo==sexo && individuo.especie==idUsuario){
-							hembras[j]=individuo;
+							indivaux[j]=individuo;
 							j++;
 						}
-					}
-					return hembras;
+					}					
 				}
-			}						
+			}	
+			retrollamada(null,indivaux);					
 		});	
 	});
 	baseDatos.close();
@@ -334,6 +332,7 @@ var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD
 	}	
 }
 
+//arreglar devolucion, deben ser retrollamadas
 var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = function(idSimulacion, idUsuario, paso, nuevosCodigosEspecie){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
@@ -365,13 +364,14 @@ var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = functio
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		baseDatos.all(updateSQL, [tablero, 1, idSimulacion, idUsuario, paso], function(err1, rows) {
+			var actualizado=false;
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return false;
 			}
 			else{
-				return true;
+				actualizado = true;
 			}
+			return actualizado;
 		});	
 	});
 	baseDatos.close();
@@ -388,16 +388,16 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario, paso], function(err1, rows) {
+			var tabaux = null;
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return null;
 			}
 			else{
 				if(rows[0].filas==1){
-					return JSON.parse(rows[0].TABLERO);
+					tabaux = JSON.parse(rows[0].TABLERO);
 				}
-				return null;
 			}
+			return tabaux;
 		});	
 	});
 	baseDatos.close();
@@ -436,7 +436,7 @@ var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimula
 	}
 }
 
-var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(idSimulacion){
+var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(idSimulacion,retrollamada){
 	var fase=-1;
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
@@ -447,14 +447,13 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return fase;
 			}
 			else{
 				if(rows[0].filas==1){
-					return rows[0].FASE;
+					fase = rows[0].FASE;
 				}
-				return fase;
 			}
+			retrollamada(null,fase);
 		});	
 	});
 	baseDatos.close();
@@ -463,7 +462,7 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 	}
 }
 
-var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(idSimulacion){
+var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(idSimulacion,retrollamada){
 	var paso=-1;
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
@@ -474,14 +473,13 @@ var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(id
 		baseDatos.all(consultaSQL, [idSimulacion], function(err1, rows) {
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return paso;
 			}
 			else{
 				if(rows[0].filas==1){
-					return rows[0].PASO;
+					paso = rows[0].PASO;
 				}
-				return paso;
 			}
+			retrollamada(null,paso);
 		});	
 	});
 	baseDatos.close();

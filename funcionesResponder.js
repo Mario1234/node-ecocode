@@ -1,39 +1,80 @@
 var fbd = require( __dirname + '/funcionesBaseDatos.js');
 
+//CARGA DE LIBRERIAS EXTERNAS CON REQUIRE
+var ClaseAsync = require("async");//para trabajar con semaforos de procesos asincronos
+
+//------------------------PRIVADAS----------------------------------
+
 function enviaCadenaHTML(respuesta, html_cadena) {
     respuesta.writeHead(200, { 'Content-Type': 'text/html' });
     respuesta.write(html_cadena);
     respuesta.end();
 }
 
-var enviaSemillasHembras = module.exports.enviaSemillasHembras = function(respuesta, idSimulacion, idUsuario, codigosEspecie){	
+function quitaFuncionesProhibidas(cadenaCodigo) {
+    var cadenaCodigoRes=cadenaCodigo.replace(/XMLHttpRequest/g,"");
+    cadenaCodigoRes=cadenaCodigoRes.replace(/jquery/g,"");
+    cadenaCodigoRes=cadenaCodigoRes.replace(/FileReader/g,"");
+    cadenaCodigoRes=cadenaCodigoRes.replace(/webkitRTCPeerConnection/g,""); 
+    cadenaCodigoRes=cadenaCodigoRes.replace(/mozRTCPeerConnection/g,""); 
+    return cadenaCodigoRes;
+}
+
+//------------------------PUBLICAS----------------------------------
+
+var enviaSemillasHembras = module.exports.enviaSemillasHembras = function(respuesta, idSimulacion, idUsuario, codigosEspecie){
+    if(codigosEspecie[0]==null){
+        codigosEspecie[0]="";
+    }	
+    else{
+        codigosEspecie[0] = quitaFuncionesProhibidas(codigosEspecie[0]);
+        codigosEspecie[0]=codigosEspecie[0].replace(/'/g,"&#39;");//las comillas simples se pasan en nomenclatura HTML
+    }
+    if(codigosEspecie[1]==null){
+        codigosEspecie[1]="";
+    }	
+    else{
+        codigosEspecie[1] = quitaFuncionesProhibidas(codigosEspecie[1]);
+        codigosEspecie[1]=codigosEspecie[1].replace(/'/g,"&#39;"); 
+    }
 	var iniHembras = "<html><head></head><body><script>";
 	var hembrasHTML = iniHembras+codigosEspecie[1]+"</script><form id='idDecisionHembrasForm' action='/decisionhembras' method='post'>";
 	hembrasHTML+="<input type='hidden' id='idCodigoMacho' name='nameCodigoMacho' value='"+codigosEspecie[0]+"'>";
 	hembrasHTML+="<input type='hidden' id='idCodigoHembra' name='nameCodigoHembra' value='"+codigosEspecie[1]+"'>";
 	hembrasHTML+="<ul id='idHembras'>";
-	var hembras = fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H");
-	var i;
-	for(i=0;i<hembras.length;i++){
-		//manda la decision de aceptar semilla como no aceptar por defecto
-		hembrasHTML+="<li><input type='hidden' id='"+hembras[i].id+"' name='"+hembras[i].id+"' value='{'movimiento':'NO','decision':'N'}'>"+hembras[i].semilla+"</li>";
-	};
-	hembrasHTML+="</ul></form></body></html>";
-	enviaCadenaHTML(respuesta,hembrasHTML);
+    ClaseAsync.series([function(retrollamada){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada)}],function (err, resultados){
+        var indivaux = resultados[0];
+        if(indivaux!=null){
+            var i;
+            for(i=0;i<indivaux.length;i++){
+                //manda la decision de aceptar semilla como no aceptar por defecto
+                hembrasHTML+="<li><input type='hidden' id='m"+indivaux[i].id+"' name='d"+indivaux[i].id+"' value='NO'>"+indivaux[i].semilla+"</li>";
+                hembrasHTML+="<li><input type='hidden' id='d"+indivaux[i].id+"' name='m"+indivaux[i].id+"' value='N'>"+indivaux[i].semilla+"</li>";
+            };
+            hembrasHTML+="</ul></form></body></html>";
+            enviaCadenaHTML(respuesta,hembrasHTML);
+        }        
+    });   	
 }
 
-var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta, idSimulacion, idUsuario, tablero, codigosEspecie){	
+var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta, idSimulacion, idUsuario, tablero){	
 	var iniMachos = "<html><head></head><body><script>";
-	var machosHTML = iniMachos+codigosEspecie[0]+"</script><form id='idDecisionMachosForm' action='/decisionmachos' method='post'>";
+    var machosHTML = iniMachos+this.codigosEspecie[0]+"</script><p id='idTablero'>"+JSON.stringify(tablero)+"</p>";
+    machosHTML+="<form id='idDecisionMachosForm' action='/decisionmachos' method='post'>";
 	machosHTML+="<ul id='idMachos'>";
-	var machos = fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M");
-	var i;
-	for(i=0;i<machos.length;i++){
-		//manda la decision de aceptar semilla como no aceptar por defecto
-		machosHTML+="<li><input type='hidden' id='"+machos[i].id+"' name='"+machos[i].id+"' value='{'movimiento':'NO','semilla':''}'></li>";
-	};
-	machosHTML+="</ul></form></body></html>";
-	enviaCadenaHTML(respuesta,machosHTML);
+	ClaseAsync.series([function(retrollamada){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada)}],function (err, resultados){
+        var indivaux = resultados[0];
+        if(indivaux!=null){
+            var i;
+            for(i=0;i<indivaux.length;i++){
+                //manda la decision de aceptar semilla como no aceptar por defecto
+                machosHTML+="<li><input type='hidden' id='m"+indivaux[i].id+"' name='m"+indivaux[i].id+"' value='NO'></li>";
+                machosHTML+="<li><input type='hidden' id='s"+indivaux[i].id+"' name='s"+indivaux[i].id+"' value=''></li>";
+            };
+            machosHTML+="</ul></form></body></html>";
+            enviaCadenaHTML(respuesta,machosHTML);
+        }        
+    });
 }
 
 var enviaMensaje = module.exports.enviaMensaje = function(err,html_cadena) {

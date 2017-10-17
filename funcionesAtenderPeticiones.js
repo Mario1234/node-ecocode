@@ -3,6 +3,24 @@ var fr = require( __dirname + '/funcionesResponder.js');
 var funcionesExtra = require( __dirname + '/funcionesExtra.js');
 var funcionesArchivos = require( __dirname + '/funcionesArchivos.js');
 
+//CARGA DE LIBRERIAS EXTERNAS CON REQUIRE
+var ClaseAsync = require("async");//para trabajar con semaforos de procesos asincronos
+
+//------------------------PRIVADAS----------------------------------
+
+function cogeCodigos(respuesta, idSimulacion, paso,retrollamada){
+    var codigos;
+    if(paso==0){
+        codigos = fbd.dameCodigosEspecieBBDD(idUsuario);
+    }
+    else{
+        codigos = fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso-1);
+    }	
+    retrollamada(null,codigos);    
+}
+
+//------------------------PUBLICAS----------------------------------
+
 var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta){
 	var idUsuario = peticion.session.idUsuario;
 	var idSimulacion = peticion.session.idSimulacion;	
@@ -10,37 +28,45 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 	var fase = peticion.session.fase;
 	//solo si la simulacion esta en la fase 1 que la de machos, la sesion del jugador esta tambien en fase 1
 	//y el paso del jugador es el de la simulacion
-	if(fase==1 && fbd.dameFaseSimulacionBBDD(idSimulacion)==1 && fbd.damePasoSimulacionBBDD(idSimulacion)==paso){
-		var machos = fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M");
-		var respuestasMachos;
-		var i;
-		for(i=0;i<machos.length;i++){
-			respuestasMachos[i].id=machos[i].id;
-			var decisionesString = peticion.body[""+machos[i].id];
-			respuestasMachos[i].decisiones=JSON.parse(decisionesString);
+	ClaseAsync.parallel([
+		function(retrollamada1){fbd.dameFaseSimulacionBBDD(idSimulacion,retrollamada1)},
+		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
+	function (err, resultados){
+		if(fase==1 && resultados[0]==1 && resultados[1]==paso){
+			ClaseAsync.parallel([
+				function(retrollamada2){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada2)},
+				function(retrollamada2){fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso,retrollamada2)}],
+			function(err2,resultados2){
+				var machos = resultados2[0];
+				var respuestasMachos;
+				var i;
+				for(i=0;i<machos.length;i++){
+					respuestasMachos[i].id=machos[i].id;
+					respuestasMachos[i].movimiento = peticion.body["m"+machos[i].id];
+					respuestasMachos[i].semilla = peticion.body["s"+machos[i].id];
+				}
+				var tablero = resultados2[1];
+				var individuos = tablero.individuos;
+				var i;
+				for(i=0;i<individuos.length;i++){
+					var individuo = individuos[i];
+					var respuestaMacho = funcionesExtra.dameRespuestaId(individuo.id,respuestasMachos);
+					if(respuestaMacho!=null){
+						individuo.movimiento=respuestaMacho.decisiones.movimiento;
+						individuo.semilla=respuestaMacho.decisiones.semilla;
+					}
+				}				
+				ClaseAsync.parallel([
+					function(retrollamada3){cogeCodigos(retrollamada3)},
+					function(retrollamada3){fbd.actualizaTableroPasoBBDD(idSimulacion, idUsuario, paso, tablero,retrollamada3)}],
+				function(err3,resultados3){
+					var codigos = resultados3[0];
+					peticion.session.fase = 0;
+					fr.enviaSemillasHembras(respuesta,idSimulacion,idUsuario,codigos);
+				});
+			});
 		}
-		var tablero = fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso);
-		var individuos = tablero.individuos;
-		var i;
-		for(i=0;i<individuos.length;i++){
-			var individuo = individuos[i];
-			var respuestaMacho = funcionesExtra.dameRespuestaId(individuo.id,respuestasMachos);
-			if(respuestaMacho!=null){
-				individuo.movimiento=respuestaMacho.decisiones.movimiento;
-				individuo.semilla=respuestaMacho.decisiones.semilla;
-			}
-		}
-		fbd.actualizaTableroPasoBBDD(idSimulacion, idUsuario, paso, tablero);
-		var codigos;
-		if(paso==0){
-			codigos = fbd.dameCodigosEspecieBBDD(idUsuario);
-		}
-		else{
-			codigos = fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso-1);
-		}	
-		peticion.session.fase = 0;
-		fr.enviaSemillasHembras(respuesta,idSimulacion,idUsuario,codigos);
-	}
+	});
 }
 
 //recoge las respuestas de las hembras: decisiones y movimientos
@@ -59,53 +85,66 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 	var fase = peticion.session.fase;
 	//solo si la simulacion esta en la fase 0 que la de hembras, la sesion del jugador esta tambien en fase 0
 	//y el paso del jugador es el de la simulacion
-	if(fase==0 && fbd.dameFaseSimulacionBBDD(idSimulacion)==0 && fbd.damePasoSimulacionBBDD(idSimulacion)==paso){
-		var hembras = fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H");
-		var respuestasHembras;
-		var i;
-		for(i=0;i<hembras.length;i++){
-			respuestasHembras[i].id=hembras[i].id;
-			var decisionesString = peticion.body[""+hembras[i].id];
-			respuestasHembras[i].decisiones=JSON.parse(decisionesString);
-		}
-		var tablero = fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso);
-		var individuos = tablero.individuos;
-		var i;
-		for(i=0;i<individuos.length;i++){
-			var individuo = individuos[i];
-			var respuestaHembra = funcionesExtra.dameRespuestaId(individuo.id,respuestasHembras);
-			if(respuestaHembra!=null){
-				individuo.movimiento=respuestaHembra.decisiones.movimiento;
-				individuo.decision=respuestaHembra.decisiones.decision;
-			}
-		}
-		fbd.actualizaTableroPasoBBDD(idSimulacion, idUsuario, paso, tablero);
-		var nuevosCodigosEspecie;
-		nuevosCodigosEspecie[0]=peticion.body.nameCodigoMacho;
-		nuevosCodigosEspecie[1]=peticion.body.nameCodigoHembra;
-		fbd.actualizaCodigosPasoBBDD(idSimulacion, idUsuario, paso, nuevosCodigosEspecie);
-		var codigosEspecie;
-		if(paso==0){
-			codigosEspecie = fbd.dameCodigosEspecieBBDD(idUsuario);
-		}
-		else{
-			codigosEspecie = fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso-1);
-		}	
-		peticion.session.fase = 1;
-		fr.enviaTableroMachos(respuesta, idSimulacion, idUsuario, tablero, codigosEspecie);
-	}	
+	ClaseAsync.parallel([
+		function(retrollamada1){fbd.dameFaseSimulacionBBDD(idSimulacion,retrollamada1)},
+		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
+	function (err, resultados){
+		if(fase==0 && resultados[0]==0 && resultados[1]==paso){
+			ClaseAsync.parallel([
+				function(retrollamada2){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada2)},
+				function(retrollamada2){fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso,retrollamada2)}],
+			function(err2,resultados2){
+				var hembras = resultados2[0];
+				var respuestasHembras;
+				var i;
+				for(i=0;i<hembras.length;i++){
+					respuestasHembras[i].id=hembras[i].id;
+					var decisionesString = peticion.body[""+hembras[i].id];
+					respuestasHembras[i].decisiones=JSON.parse(decisionesString);
+				}
+				var tablero = resultados[1];
+				var individuos = tablero.individuos;
+				var i;
+				for(i=0;i<individuos.length;i++){
+					var individuo = individuos[i];
+					var respuestaHembra = funcionesExtra.dameRespuestaId(individuo.id,respuestasHembras);
+					if(respuestaHembra!=null){
+						individuo.movimiento=respuestaHembra.decisiones.movimiento;
+						individuo.decision=respuestaHembra.decisiones.decision;
+					}
+				}
+				fbd.actualizaTableroPasoBBDD(idSimulacion, idUsuario, paso, tablero);
+				var nuevosCodigosEspecie;
+				nuevosCodigosEspecie[0]=peticion.body.nameCodigoMacho;
+				nuevosCodigosEspecie[1]=peticion.body.nameCodigoHembra;
+			});
+			ClaseAsync.parallel([
+				function(retrollamada3){cogeCodigos(retrollamada3)},
+				function(retrollamada3){fbd.actualizaCodigosPasoBBDD(idSimulacion, idUsuario, paso, nuevosCodigosEspecie,retrollamada3)}],
+			function(err3,resultados3){
+				var codigos = resultados3[0];
+				peticion.session.fase = 1;
+				fr.enviaTableroMachos(respuesta,idSimulacion,idUsuario,tablero, codigos);
+			});
+		}		
+	});	
 }
 
 var actualizaListaEspecies = module.exports.actualizaListaEspecies = function(peticion,respuesta){
 	var idUsuario = peticion.session.idUsuario;
 	var idSimulacion = peticion.session.idSimulacion;
-	if(!fbd.miraSiEmpiezaSimulacionBBDD(idSimulacion)){
-		fbd.dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario);
-	}	
-	else{
-		var codigosEspecie = fbd.dameCodigosEspecieBBDD(idUsuario);
-		fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, codigosEspecie);	
-	}
+	//recoge codigos especie y mira si empieza la simulacion
+	//si empieza enviaSemillasHembras y sino pide la lista de especies de nuevo
+	ClaseAsync.series([function(retrollamada){fbd.dameCodigosEspecieBBDD(idUsuario,retrollamada)}],function(err,resultados1){
+		ClaseAsync.series([function(retrollamada2){fbd.miraSiEmpiezaSimulacionBBDD(idSimulacion,retrollamada2)}],function(err,resultados2){
+			if(resultados2[0]){
+				fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados1[0]);
+			}
+			else{
+				fbd.dameListaEspeciesSimulacionBBDD(respuesta, idSimulacion, idUsuario);				
+			}
+		});
+	});
 }
 
 var marcarPreparado = module.exports.marcarPreparado = function(peticion,respuesta){
