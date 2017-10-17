@@ -39,10 +39,10 @@ var autentificaBBDD = module.exports.autentificaBBDD = function(peticion, respue
                 funcionesArchivos.leeArchivo(__dirname + "\\botones.html",fr.enviaMensaje.bind({respuesta: respuesta, mensaje:resultadoLogin}));
 				console.log(resultadoLogin);
 			}					
-			console.log(resultadoLogin);			
+			console.log(resultadoLogin);	
+			baseDatos.close();		
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
         resultadoLogin = "error al conectar con BBDD";
         funcionesArchivos.leeArchivo(__dirname + "\\botones.html",fr.enviaMensaje.bind({respuesta: respuesta, mensaje:resultadoLogin}));
@@ -50,37 +50,36 @@ var autentificaBBDD = module.exports.autentificaBBDD = function(peticion, respue
 	}	
 }
 
-var subeCodigosUsuarioBBDD = module.exports.subeCodigosUsuarioBBDD = function(respuesta, idUsuario, machoCodigo,hembraCodigo){
+var subeCodigosUsuarioBBDD = module.exports.subeCodigosUsuarioBBDD = function(respuesta, idUsuario, machoCodigo,hembraCodigo,retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(*) as conteo FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
+	var consultaSQL = "SELECT * FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
 	var insertSQL = "INSERT INTO CODIGOS_ESPECIE (ID_ESPECIE, CODIGO_MACHO, CODIGO_HEMBRA) VALUES (?, ?, ?)";
 	var updateSQL = "UPDATE CODIGOS_ESPECIE SET (CODIGO_MACHO=?, CODIGO_HEMBRA=?) WHERE ID_ESPECIE = ?";
 	console.log(consultaSQL);
     var baseDatos = new sqlite3.Database("miBaseDatos.db");	
-    var mensaje = "error al subir los codigos";
+	var error = null;//"error al subir los codigos";
 	baseDatos.serialize(function() {
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL,[idUsuario], function(err, rows) {
-			if(error){
-				mensaje = error;
+			if(err){
+				error = new Error(errr);
 			}
 			else{
-				if(rows[0].conteo>0){
+				if(rows.length>0){
 					baseDatos.run(updateSQL,[machoCodigo,hembraCodigo,idUsuario]);
 				}
 				else{
 					baseDatos.run(insertSQL,[idUsuario,machoCodigo,hembraCodigo]);
 				}
-				mensaje="datos subidos con exito";
 			}						
+			retrollamada(error,"datos subidos con exito");
+			baseDatos.close();
 		});	
-		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:mensaje}));
 	});
-	baseDatos.close();
 	if(baseDatos==null){
-        mensaje = "error al conectar con BBDD";
-		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:mensaje}));
+        error = new Error("error al conectar con BBDD");
+		retrollamada(error);
 	}	
 }
 
@@ -106,10 +105,10 @@ var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respue
 				}
                 console.log(nom + ": " + con);
                 funcionesArchivos.leeArchivo(__dirname + "\\datos.html", fr.enviaDatos.bind({respuesta: respuesta, nom:nom, con:con, codM:codM, codH:codH}));
-			}			
+			}		
+			baseDatos.close();	
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
@@ -153,9 +152,9 @@ var dameListaSimulacionesActivasBBDD = module.exports.dameListaSimulacionesActiv
                 //el bind aniade parametros a la funcion retrollamada, en este caso enviaListaSimulaciones tendra respuesta y 
                 //rows como parametros extra para poder responder al cliente. para acceder dentro de la funcion se usa this, ejemplo: this.rows
 			}
+			baseDatos.close();
 		});
-	});
-	baseDatos.close();
+	});	
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
@@ -171,7 +170,8 @@ var creaPasoUsuarioBBDD = module.exports.creaPasoUsuarioBBDD = function(respuest
 		if(err1){
 			funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 		}
-		retrollamada();		
+		retrollamada();	
+		baseDatos.close();	
 	});
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
@@ -186,36 +186,28 @@ var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacion
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");		
 	console.log(consultaSQL);
 	baseDatos.all(consultaSQL,[idSimulacion], function(err1, rows) {
-		var listaEspecies = "";
+		var listaEspecies = [];
 		var error = null;
 		if(err1){
 			error=new Error(err1);
 		}
 		else{
 			if(rows.length>0){
-				listaEspecies += "<ul>";
-				rows.forEach(function(row) {
-					var preparado="esperando...";
-					if(row.PREPARADO==1){
-						preparado="Listo";
-					}
-					listaEspecies += "<li><p>"+row.nombre+": "+preparado+"</p></li>";
-				}, this);
-				listaEspecies += "</ul>";
-				                    
+				listaEspecies = rows;				                    
 			}	
 			else{
 				error=new Error("error lista jugadores");				
 			}				
 		}
 		retrollamada(error,listaEspecies);
+		baseDatos.close();
 	});
 	if(baseDatos==null){
 		retrollamada(new Error("error al conectar con BBDD"));
 	}
 }
 
-var marcarPreparadoONoBBDD = module.exports.marcarPreparadoBBDD = function(respuesta, idUsuario, preparado){
+var marcarPreparadoONoBBDD = module.exports.marcarPreparadoONoBBDD = function(respuesta, idUsuario, preparado){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var updateSQL = "UPDATE USUARIO SET PREPARADO=? WHERE id=?";
@@ -230,10 +222,10 @@ var marcarPreparadoONoBBDD = module.exports.marcarPreparadoBBDD = function(respu
 			}
 			else{
 				return true;
-			}						
+			}				
+			baseDatos.close();		
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
@@ -257,10 +249,10 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 					empieza=true;
 				}
 			}			
-			retrollamada(null,empieza);			
+			retrollamada(null,empieza);	
+			baseDatos.close();		
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
@@ -284,10 +276,10 @@ var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(id
 					listaCodigosEspecie[1]=rows[0].CODIGO_HEMBRA;
 				}
 			}		
-			retrollamada(null, listaCodigosEspecie);			
+			retrollamada(null, listaCodigosEspecie);	
+			baseDatos.close();		
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
@@ -320,10 +312,10 @@ var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD
 					}					
 				}
 			}	
-			retrollamada(null,indivaux);					
+			retrollamada(null,indivaux);	
+			baseDatos.close();				
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
@@ -344,15 +336,15 @@ var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = functio
 			else{
 				retrollamada(null,true);
 			}
+			baseDatos.close();
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){		
 		retrollamada(new Error("error al conectar con BBDD"),false);
 	}	
 }
 
-var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = function(idSimulacion, idUsuario, paso, tablero){
+var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = function(respuesta,idSimulacion, idUsuario, paso, tablero){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var updateSQL = "UPDATE PASO_SIMULACION SET(TABLERO=?, HECHA_DECISION_HEMBRAS=?) WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
@@ -367,10 +359,10 @@ var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = functio
 			else{
 				actualizado = true;
 			}
+			baseDatos.close();
 			return actualizado;
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
@@ -394,17 +386,17 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 				}
 			}
 			retrollamada(null,tabaux);
+			baseDatos.close();
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
 }
 
 var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimulacion, idUsuario, paso,retrollamada){
-	var codMach;
-	var codHemb;
+	var codMach=null;
+	var codHemb=null;
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT CODIGO_MACHO, CODIGO_HEMBRA FROM PASO_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
@@ -418,16 +410,16 @@ var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimula
 			}
 			else{
 				if(rows.length==1){
-					codMach = JSON.parse(rows[0].CODIGO_MACHO);
-					codHemb = JSON.parse(rows[0].CODIGO_HEMBRA);
+					codMach = rows[0].CODIGO_MACHO;
+					codHemb = rows[0].CODIGO_HEMBRA;
 				}
 			}
 			listaCodigos[0]=codMach;
 			listaCodigos[1]=codHemb;
 			retrollamada(null,listaCodigos);
+			baseDatos.close();
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
@@ -451,9 +443,9 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 				}
 			}
 			retrollamada(null,fase);
+			baseDatos.close();
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}
@@ -477,9 +469,9 @@ var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(id
 				}
 			}
 			retrollamada(null,paso);
+			baseDatos.close();
 		});	
 	});
-	baseDatos.close();
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}

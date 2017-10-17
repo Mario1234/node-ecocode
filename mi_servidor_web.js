@@ -36,8 +36,8 @@ instanciaExpress.get("/listasimulaciones", fap.listarSimulaciones);//si pide la 
 instanciaExpress.post("/entrarsimulacion", fap.entrarSimulacion);//si pide entrar a una simulacion activa de la lista
 instanciaExpress.get("/preparado", fap.marcarPreparado);//pide pasar a estado preparado, para comenzar la simulacion en cuanto esten todos
 instanciaExpress.get("/actualizalistaespecies", fap.actualizaListaEspecies);//si el temporizador se activa y pide refesco de lista jugadores de la simulacion
-instanciaExpress.get("/decisionhembras", fap.decisionHembras);//si envia las decisiones y movs de las hembras y codigos evolucionados, se le devuelve la fase de los machos
-instanciaExpress.get("/decisionmachos", fap.decisionMachos);//si envia las semillas y movs de los machos, se le devuelve la fase de las hembras del sig paso
+instanciaExpress.post("/decisionhembras", fap.decisionHembras);//si envia las decisiones y movs de las hembras y codigos evolucionados, se le devuelve la fase de los machos
+instanciaExpress.post("/decisionmachos", fap.decisionMachos);//si envia las semillas y movs de los machos, se le devuelve la fase de las hembras del sig paso
 
 var servidor = ClaseHttps.createServer(opcionesConexion,instanciaExpress);
 servidor.listen(443);

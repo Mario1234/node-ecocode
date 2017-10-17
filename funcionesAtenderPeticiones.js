@@ -28,7 +28,7 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 				//se marcan como no preparados a que el servidor ejecute el siguiente paso
 				fbd.marcarPreparadoONoBBDD(respuesta,idUsuarioSimulacion,0);
 				//ENCOLA: pide el tablero con decisiones del paso anterior de cada jugador
-				listaFuncionesLambda.push(function(retrollamada3){fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso-1,retrollamada3)});							
+				listaFuncionesLambda.push(function(retrollamada3){fbd.dameTableroPasoBBDD(idSimulacion, idUsuarioSimulacion, paso-1,retrollamada3)});							
 			}
 			//ejecuta de manera ordenada el tratamiento de tableros de cada jugador
 			ClaseAsync.series(listaFuncionesLambda,function(err2,resultados2){
@@ -45,7 +45,7 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 				var tableroStringGlobal = JSON.stringify(tableroGlobal);
 				var listaFuncionesLambda2 = [];		
 				for(i=0;i<listaEspeciesSimulacion.length;i++){
-					//ENCOLA: recoge los codigos de cada jugador del apso anterior
+					//ENCOLA: recoge los codigos de cada jugador del paso anterior
 					listaFuncionesLambda2.push(function(retrollamada3){fbd.dameCodigosPasoBBDD(idSimulacion,idUsuarioSimulacion,paso-1,retrollamada3)});
 				}
 				//ejecuta en serie la obtencion de codigos de cada jugador, lo devuelve ordenado
@@ -54,11 +54,11 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 					for(i=0;i<listaEspeciesSimulacion.length;i++){
 						var idUsuarioSimulacion = listaEspeciesSimulacion[i];
 						//ENCOLA: se crea el siguiente paso para esa simu y ese usuario, guardando el tablero con las acciones de este paso realizadas
-						listaFuncionesLambda2.push(function(retrollamada3){fbd.creaPasoUsuarioBBDD(respuesta,
-							idSimulacion,paso,idUsuarioSimulacion,tableroStringGlobal,resultados3[0][0],resultados3[0][1],retrollamada3)});
+						listaFuncionesLambda3.push(function(retrollamada3){fbd.creaPasoUsuarioBBDD(respuesta,
+							idSimulacion,paso,idUsuarioSimulacion,tableroStringGlobal,resultados3[i][0],resultados3[i][1],retrollamada3)});
 					}				
 					//ejecuta en paralelo la creacion del sig paso, el mismo para cada jugador
-					ClaseAsync.parallel(listaFuncionesLambda2,function(err4,resultados4){
+					ClaseAsync.parallel(listaFuncionesLambda3,function(err4,resultados4){
 						retrollamada();
 					});
 				});								
@@ -91,9 +91,9 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 				}
 				else{
 					//guarda las decisiones de los machos en el tablero del paso actual
-					var tablero = funcionesExtra.dameTableroActualizadoUsuario(resultados2[0],resultados2[1],"s");						
+					var tablero = funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],resultados2[1],"s");						
 					ClaseAsync.series([
-						function(retrollamada3){fbd.actualizaTableroPasoBBDD(idSimulacion, idUsuario, paso, tablero,retrollamada3)}],
+						function(retrollamada3){fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tablero,retrollamada3)}],
 					function(err3,resultados3){
 						if(err3){
 							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
@@ -142,8 +142,8 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
 				}
 				else{
-					var tablero = funcionesExtra.dameTableroActualizadoUsuario(resultados2[0],resultados2[1],"d");					
-					fbd.actualizaTableroPasoBBDD(idSimulacion, idUsuario, paso, tablero);
+					var tablero = funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],resultados2[1],"d");					
+					fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tablero);
 					var nuevosCodigosEspecie=[];
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoMacho);
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoHembra);
@@ -158,7 +158,9 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 						else{
 							var codigos = resultados3[0];
 							peticion.session.fase = 1;
-							fr.enviaTableroMachos(respuesta,idSimulacion,idUsuario,tablero, codigos);
+							ClaseAsync.series([function(retrollamada4){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada4)}],function (err4, resultados4){
+								fr.enviaTableroMachos(respuesta,idSimulacion,idUsuario,tablero, codigos,resultados4[0]);
+							});							
 						}					
 					});
 				}
@@ -180,14 +182,17 @@ var actualizaListaEspecies = module.exports.actualizaListaEspecies = function(pe
 		if(resultados1[0]){
 			//ejecuta el paso anterior var tableroResultadoPaso 
 			ClaseAsync.series([
-				function(retrollamada2){ejecutaPaso(idSimulacion,paso,retrollamada2),
-				function(retrollamada2){fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso,retrollamada2)}}
+				function(retrollamada2){ejecutaPaso(respuesta,idSimulacion,paso,retrollamada2)},
+				function(retrollamada2){fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso,retrollamada2)}
 			],function(err2,resultados2){	
 				if(err2){
 					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
 				}
 				else{
-					fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados2[0]);		
+					ClaseAsync.series([function(retrollamada3){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada3)}],function (err3, resultados3){
+						fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados2[1], resultados3[0]);
+					});	
+							
 				}	
 			});
 		}
@@ -248,12 +253,19 @@ var subirCodigos = module.exports.subirCodigos = function(peticion,respuesta){
 	var idUsuario = peticion.session.idUsuario;
 	var machoCodigo=peticion.body.machoCodigo;
 	var hembraCodigo=peticion.body.hembraCodigo;
-	fbd.subeCodigosUsuarioBBDD(respuesta,idUsuario,machoCodigo,hembraCodigo);
+	ClaseAsync.series([function(retrollamada){fbd.subeCodigosUsuarioBBDD(respuesta,idUsuario,machoCodigo,hembraCodigo,retrollamada)}],
+		function (err, resultados){
+			if(err){
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta,  mensaje:err}));
+			}else{
+				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta,  mensaje:resultados[0]}));
+			}
+		}
+	);
 	// console.log("machoCodigo");
 	// console.log(machoCodigo);
 	// console.log("hembraCodigo");
     // console.log(hembraCodigo);
-    funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta}));
 }
 
 var menuCuenta = module.exports.menuCuenta = function(peticion,respuesta){

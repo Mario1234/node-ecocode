@@ -11,8 +11,8 @@ var dameRespuestaId = module.exports.dameRespuestaId = function (id,respuestas){
 
 //lee las decisiones de los individuos(enviadas dentro del formulario) y las guarda en el tablero
 //si accion == d entonces los inds son hembras, si es == s entonces machos
-var dameTableroActualizadoUsuario = module.exports.dameTableroActualizadoUsuario = function(genteUnSexo,tablero,accion){
-	var respuestas=[];
+var dameTableroActualizadoUsuario = module.exports.dameTableroActualizadoUsuario = function(peticion,genteUnSexo,tablero,accion){
+	var respuestasInds =[];
 	var i;
 	for(i=0;i<genteUnSexo.length;i++){
 		var respuestaInd = {};//{id:"", movimiento:"", semilla:""}
