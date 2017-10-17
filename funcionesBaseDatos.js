@@ -13,14 +13,14 @@ var autentificaBBDD = module.exports.autentificaBBDD = function(peticion, respue
 	var resultadoLogin = "";
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(id) as filas, id, nombre, contrasegna FROM USUARIO WHERE nombre=?";
+	var consultaSQL = "SELECT id, nombre, contrasegna FROM USUARIO WHERE nombre=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
 		baseDatos.all(consultaSQL, [nombre], function(err, rows) {
 			console.log(rows[0].nombre + ": " + rows[0].contrasegna);
-			if(rows[0].filas>0){//mientras no encuentre al usuario introducido sigue buscando
+			if(rows.length>0){//mientras no encuentre al usuario introducido sigue buscando
 				if(rows[0].nombre==nombre){
 					if(rows[0].contrasegna==contrasegna){//si caso el usuario se comprueba la contrseña
 						resultadoLogin="contraseña correcta";
@@ -87,7 +87,7 @@ var subeCodigosUsuarioBBDD = module.exports.subeCodigosUsuarioBBDD = function(re
 var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respuesta, idUsuario){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(nombre) as filas, nombre, contrasegna, codigo_macho, codigo_hembra FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
+	var consultaSQL = "SELECT nombre, contrasegna, codigo_macho, codigo_hembra FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -98,7 +98,7 @@ var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respue
 			}
 			else{
 				var nom = "";var con = "";var codM = "";var codH = "";			
-				if(rows[0].filas>0){
+				if(rows.length>0){
 					nom = rows[0].nombre;
 					con = rows[0].contrasegna;
 					codM = rows[0].codigo_macho;
@@ -125,7 +125,7 @@ function leeRetrollamada(err2,html_cadena) {
 var dameListaSimulacionesActivasBBDD = module.exports.dameListaSimulacionesActivasBBDD = function(respuesta){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(ID_SIMULACION) as filas, ID_SIMULACION FROM SIMULACION WHERE NUMERO_ESPECIES<MAX_NUM_ESPECIES";
+	var consultaSQL = "SELECT ID_SIMULACION FROM SIMULACION WHERE NUMERO_ESPECIES<MAX_NUM_ESPECIES";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -161,63 +161,61 @@ var dameListaSimulacionesActivasBBDD = module.exports.dameListaSimulacionesActiv
 	}	
 }
 
-//recomendacion: usar insert ignoer en vez de select y luego insert
-var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacionBBDD = function(respuesta, idSimulacion, idUsuario){
-	var tableroString = JSON.stringify(funcionesExtra.dameTableroInicial());
+var creaPasoUsuarioBBDD = module.exports.creaPasoUsuarioBBDD = function(respuesta, idSimulacion, paso, idUsuario, tableroString, codM, codH, retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
 	var sqlite3 = require("sqlite3").verbose();
-	var insertSQL = "INSERT INTO PASO_SIMULACION (ID_SIMULACION, PASO, ID_ESPECIE, TABLERO, HECHA_DECISION_HEMBRAS) VALUES (?, ?, ?, ?, ?)";
-	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, ID_ESPECIE, nombre, PREPARADO FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id WHERE ID_SIMULACION=?";
-	var consulta2SQL = "SELECT count(ID_ESPECIE) as filas, ID_ESPECIE FROM PASO_SIMULACION WHERE ID_SIMULACION=? AND ID_ESPECIE=?";
-	console.log(consultaSQL);
+	var insertSQL = "INSERT OR IGNORE INTO PASO_SIMULACION (ID_SIMULACION, PASO, ID_ESPECIE, TABLERO, HECHA_DECISION_HEMBRAS, CODIGO_MACHO, CODIGO_HEMBRA) VALUES (?, ?, ?, ?, ?, ?, ?)";
+	console.log(insertSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
-	//crea el paso0 para el jugador que se acaba de unir
-	ClaseAsync.series([function(retroLlama){
-		var sentencia;
-		baseDatos.all(consulta2SQL,[idSimulacion, idUsuario], function(err1, rows) {
-			if(err1){
-				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-			}
-			else{
-				if(rows[0].filas<=0){
-					//insert si no existe, despues de haber hecho el select
-					baseDatos.run(insertSQL,[idSimulacion,0,idUsuario,tableroString,0]);
-				}				
-			}	
-			retroLlama();		
-		});
-	}],function (err, resultados){
-		//consigue la lista de jugadores 
-		baseDatos.all(consultaSQL,[idSimulacion], function(err1, rows) {
-			if(err1){
-				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-			}
-			else{
-				if(rows[0].filas>0){
-					var listaEspecies = "<ul>";
-					rows.forEach(function(row) {
-						var preparado="esperando...";
-						if(row.PREPARADO==1){
-							preparado="Listo";
-						}
-						listaEspecies += "<li><p>"+row.nombre+": "+preparado+"</p></li>";
-					}, this);
-                    listaEspecies += "</ul>";
-                    funcionesArchivos.leeArchivo( __dirname + "\\simulacionIni.html", fr.enviaListaEspeciesSimulacion.bind({respuesta: respuesta, listaEspecies:listaEspecies}) );                    
-				}	
-				else{
-					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error lista jugadores"}));				
-				}				
-			}
-			baseDatos.close();
-		});
+	baseDatos.run(insertSQL,[idSimulacion,paso,idUsuario,tableroString,0,codM,codH], function(err1, rows) {
+		if(err1){
+			funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
+		}
+		retrollamada();		
 	});
 	if(baseDatos==null){
 		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
 	}	
 }
 
-var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuesta, idUsuario){
+//consigue la lista de jugadores de la simulacion
+var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacionBBDD = function(idSimulacion, retrollamada){
+	var dirHTMLrespuesta = "\\errorConexionBBDD.html";
+	var sqlite3 = require("sqlite3").verbose();
+	var consultaSQL = "SELECT ID_ESPECIE, nombre, PREPARADO FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id WHERE ID_SIMULACION=?";	
+	var baseDatos = new sqlite3.Database("miBaseDatos.db");		
+	console.log(consultaSQL);
+	baseDatos.all(consultaSQL,[idSimulacion], function(err1, rows) {
+		var listaEspecies = "";
+		var error = null;
+		if(err1){
+			error=new Error(err1);
+		}
+		else{
+			if(rows.length>0){
+				listaEspecies += "<ul>";
+				rows.forEach(function(row) {
+					var preparado="esperando...";
+					if(row.PREPARADO==1){
+						preparado="Listo";
+					}
+					listaEspecies += "<li><p>"+row.nombre+": "+preparado+"</p></li>";
+				}, this);
+				listaEspecies += "</ul>";
+				                    
+			}	
+			else{
+				error=new Error("error lista jugadores");				
+			}				
+		}
+		retrollamada(error,listaEspecies);
+	});
+	if(baseDatos==null){
+		retrollamada(new Error("error al conectar con BBDD"));
+	}
+}
+
+var marcarPreparadoONoBBDD = module.exports.marcarPreparadoBBDD = function(respuesta, idUsuario, preparado){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var updateSQL = "UPDATE USUARIO SET PREPARADO=? WHERE id=?";
@@ -225,7 +223,7 @@ var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuest
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		//crea un hilo paralelo para ejecutar el codigo posterior concurrente
-		baseDatos.run(updateSQL, [1,idUsuario], function(err1, rows) {
+		baseDatos.run(updateSQL, [preparado,idUsuario], function(err1, rows) {
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 				return false;
@@ -244,7 +242,7 @@ var marcarPreparadoBBDD = module.exports.marcarPreparadoBBDD = function(respuest
 var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = function(idSimulacion,retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, MAX_NUM_ESPECIES FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION=PASO_SIMULACION.ID_SIMULACION WHERE SIMULACION.ID_SIMULACION=? AND PREPARADO=1";
+	var consultaSQL = "SELECT MAX_NUM_ESPECIES FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION=PASO_SIMULACION.ID_SIMULACION WHERE SIMULACION.ID_SIMULACION=? AND PREPARADO=1";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -255,7 +253,7 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
-				if(rows[0].filas==rows[0].MAX_NUM_ESPECIES){
+				if(rows.length>0 && rows.length==rows[0].MAX_NUM_ESPECIES){
 					empieza=true;
 				}
 			}			
@@ -271,17 +269,17 @@ var miraSiEmpiezaSimulacionBBDD = module.exports.miraSiEmpiezaSimulacionBBDD = f
 var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(idUsuario,retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(ID_ESPECIE) as filas, CODIGO_MACHO, CODIGO_HEMBRA FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
+	var consultaSQL = "SELECT CODIGO_MACHO, CODIGO_HEMBRA FROM CODIGOS_ESPECIE WHERE ID_ESPECIE=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idUsuario], function(err1, rows) {
-			var listaCodigosEspecie={};
+			var listaCodigosEspecie=[];
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
-				if(rows[0].filas==1){					
+				if(rows.length==1){					
 					listaCodigosEspecie[0]=rows[0].CODIGO_MACHO;
 					listaCodigosEspecie[1]=rows[0].CODIGO_HEMBRA;
 				}
@@ -298,19 +296,18 @@ var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(id
 var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD = function(idSimulacion, idUsuario, sexo, retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(TABLERO) as filas, TABLERO FROM PASO_SIMULACION INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION AND SIMULACION.PASO=PASO_SIMULACION.PASO WHERE SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=?";
+	var consultaSQL = "SELECT TABLERO FROM PASO_SIMULACION INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION AND SIMULACION.PASO=PASO_SIMULACION.PASO WHERE SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario], function(err1, rows) {
-			var indivaux={};
+			var indivaux=[];
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
-				if(rows[0].filas==1){
+				if(rows.length==1){
 					var tablero = JSON.parse(rows[0].TABLERO);
-					indivaux
 					var individuos = tablero.individuos;
 					var i;
 					var j=0;
@@ -333,7 +330,7 @@ var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD
 }
 
 //arreglar devolucion, deben ser retrollamadas
-var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = function(idSimulacion, idUsuario, paso, nuevosCodigosEspecie){
+var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = function(idSimulacion, idUsuario, paso, nuevosCodigosEspecie, retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
 	var updateSQL = "UPDATE PASO_SIMULACION SET(CODIGO_MACHO=?,CODIGO_HEMBRA=?) WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
@@ -342,17 +339,16 @@ var actualizaCodigosPasoBBDD = module.exports.actualizaCodigosPasoBBDD = functio
 	baseDatos.serialize(function() {
 		baseDatos.all(updateSQL, [nuevosCodigosEspecie[0],nuevosCodigosEspecie[1],idSimulacion, idUsuario, paso], function(err1, rows) {
 			if(err1){
-				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return false;
+				retrollamada(new Error(err1),false);
 			}
 			else{
-				return true;
+				retrollamada(null,true);
 			}
 		});	
 	});
 	baseDatos.close();
-	if(baseDatos==null){
-		funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:"error al conectar con BBDD"}));
+	if(baseDatos==null){		
+		retrollamada(new Error("error al conectar con BBDD"),false);
 	}	
 }
 
@@ -380,10 +376,10 @@ var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = functio
 	}
 }
 
-var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimulacion, idUsuario, paso){
+var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimulacion, idUsuario, paso, retrollamada){
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(TABLERO) as filas, TABLERO FROM PASO_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
+	var consultaSQL = "SELECT TABLERO FROM PASO_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -393,11 +389,11 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
-				if(rows[0].filas==1){
+				if(rows.length==1){
 					tabaux = JSON.parse(rows[0].TABLERO);
 				}
 			}
-			return tabaux;
+			retrollamada(null,tabaux);
 		});	
 	});
 	baseDatos.close();
@@ -406,28 +402,29 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 	}
 }
 
-var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimulacion, idUsuario, paso){
+var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimulacion, idUsuario, paso,retrollamada){
 	var codMach;
 	var codHemb;
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(CODIGO_MACHO) as filas, CODIGO_MACHO, CODIGO_HEMBRA FROM PASO_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
+	var consultaSQL = "SELECT CODIGO_MACHO, CODIGO_HEMBRA FROM PASO_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
 		baseDatos.all(consultaSQL, [idSimulacion, idUsuario, paso], function(err1, rows) {
+			listaCodigos=[codMach,codHemb];
 			if(err1){
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
-				return [codMach,codHemb];
 			}
 			else{
-				if(rows[0].filas==1){
+				if(rows.length==1){
 					codMach = JSON.parse(rows[0].CODIGO_MACHO);
 					codHemb = JSON.parse(rows[0].CODIGO_HEMBRA);
-					return [codMach,codHemb];
 				}
-				return [codMach,codHemb];
 			}
+			listaCodigos[0]=codMach;
+			listaCodigos[1]=codHemb;
+			retrollamada(null,listaCodigos);
 		});	
 	});
 	baseDatos.close();
@@ -440,7 +437,7 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 	var fase=-1;
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(FASE) as filas, FASE FROM SIMULACION WHERE SIMULACION.ID_SIMULACION=?";
+	var consultaSQL = "SELECT FASE FROM SIMULACION WHERE SIMULACION.ID_SIMULACION=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -449,7 +446,7 @@ var dameFaseSimulacionBBDD = module.exports.dameFaseSimulacionBBDD = function(id
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
-				if(rows[0].filas==1){
+				if(rows.length==1){
 					fase = rows[0].FASE;
 				}
 			}
@@ -466,7 +463,7 @@ var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(id
 	var paso=-1;
 	var dirHTMLrespuesta = "\\errorConexionBBDD.html";//si no tenemos resultado se mantiene al cliente en espera
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT count(PASO) as filas, PASO FROM SIMULACION WHERE SIMULACION.ID_SIMULACION=?";
+	var consultaSQL = "SELECT PASO FROM SIMULACION WHERE SIMULACION.ID_SIMULACION=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -475,7 +472,7 @@ var damePasoSimulacionBBDD = module.exports.damePasoSimulacionBBDD = function(id
 				funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err1}));
 			}
 			else{
-				if(rows[0].filas==1){
+				if(rows.length==1){
 					paso = rows[0].PASO;
 				}
 			}
