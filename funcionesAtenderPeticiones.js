@@ -19,8 +19,12 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 		retrollamada();
 	}
 	else{
-		ClaseAsync.series([function(retrollamada2){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada2)}],function(err,resultados){
+		ClaseAsync.series([
+			function(retrollamada2){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada2)},
+			function(retrollamada2){fbd.dameFecundacionesSimulacionBBDD(idSimulacion,retrollamada2)}
+		],function(err,resultados){
 			var listaEspeciesSimulacion = resultados[0];
+			var fecundaciones = resultados[1];
 			//aniade las funciones de manera ordenada a una lista de funciones
 			for(i=0;i<listaEspeciesSimulacion.length;i++){
 				var listaFuncionesLambda = [];
@@ -36,12 +40,17 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 				//actualiza de manera ordenada el tablero global con lo devuelto por la lista de lambdas, los tableros
 				//recorre los indivs del primer tab
 				var gente = resultados2[0].individuos;//coge los individuos de ese tablero, son el mismo num de indivs para todos los tableros
-				tableroGlobal = resultados2[0].casillas;
+				tableroGlobal.casillas = resultados2[0].casillas;
 				for(i=0;i<gente.length;i++){
 					//guarda en ese indiv del tab global la info del indiv del tab de la especie a la que pertenece ese indiv
 					var tabDeEspecieDeI = resultados2[gente[i].especie];
 					tableroGlobal.individuos.push(tabDeEspecieDeI.individuos[i]);				
-				}	
+				}					
+				funcionesExtra.movimientosNacimientos(tableroGlobal,fecundaciones);
+				for(i=0;i<fecundaciones.length;i++){
+					var fecundacion = fecundaciones[i];
+					fbd.actualizaFecundacionSimulacionBBDD(idSimulacion,fecundacion);
+				}				
 				var tableroStringGlobal = JSON.stringify(tableroGlobal);
 				var listaFuncionesLambda2 = [];		
 				for(i=0;i<listaEspeciesSimulacion.length;i++){
@@ -68,7 +77,14 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 }
 
 //------------------------PUBLICAS----------------------------------
-
+//coge el tablero del paso actual, extrae la lista de los individuos, por cada individuo mira 
+//para obtener los ids de los machos usa dameIndividuosEspecieSexoBBDD con M, y recorre esos ids
+//-usando la funcion dameTableroActualizadoUsuario recoge 
+//-las respuestas de los machos: semillas y movimientos
+//-dameTableroActualizadoUsuario devuelve el tablero con estas respuestas actualizadas
+//guarda el tablero (con los movs y semillas) en BBDD con actualizaTableroPasoBBDD
+//envia pagina a la simulacion, para que el usuario espere a que los demas hayan terminado esta fase
+//actualizaListaEspecies
 var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta){
 	var idUsuario = peticion.session.idUsuario;
 	var idSimulacion = peticion.session.idSimulacion;	
@@ -91,9 +107,11 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 				}
 				else{
 					//guarda las decisiones de los machos en el tablero del paso actual
-					var tablero = funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],resultados2[1],"s");						
+					var tablero = resultados2[1];
+					funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],tablero,"s");	
+					var tableroString = JSON.stringify(tablero);					
 					ClaseAsync.series([
-						function(retrollamada3){fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tablero,retrollamada3)}],
+						function(retrollamada3){fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tableroString,retrollamada3)}],
 					function(err3,resultados3){
 						if(err3){
 							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
@@ -113,12 +131,11 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 	});
 }
 
-//recoge las respuestas de las hembras: decisiones y movimientos
-//lo recoge de peticion.body.0 si es la hembra con id=0
-//para obtener los ids de las hembras usa dameIndividuosEspecieSexoBBDD con H, y recorre esos ids
 //coge el tablero del paso actual, extrae la lista de los individuos, por cada individuo mira 
-//si tiene una respuesta con dameRespuestaId (solo devolvera respuestas de hembras)
-//actualiza la info de los individuos del tablero, sus respuestas
+//para obtener los ids de las hembras usa dameIndividuosEspecieSexoBBDD con H, y recorre esos ids
+//-usando la funcion dameTableroActualizadoUsuario recoge 
+//-las respuestas de las hembras: decisiones y movimientos
+//-dameTableroActualizadoUsuario tb actualiza la info de los individuos del tablero, sus respuestas
 //actualiza los codigos con los codigos de la evolucion de este paso
 //recoge los codigos del paso anterior para enviar pagina de toma de decisiones a los machos
 //envia pagina de toma de decisiones de los machos
@@ -142,8 +159,10 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
 				}
 				else{
-					var tablero = funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],resultados2[1],"d");					
-					fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tablero);
+					var tablero = resultados2[1];
+					funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],tablero,"d");
+					var tableroString = JSON.stringify(tablero);					
+					fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tableroString);
 					var nuevosCodigosEspecie=[];
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoMacho);
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoHembra);
@@ -159,7 +178,12 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 							var codigos = resultados3[0];
 							peticion.session.fase = 1;
 							ClaseAsync.series([function(retrollamada4){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada4)}],function (err4, resultados4){
-								fr.enviaTableroMachos(respuesta,idSimulacion,idUsuario,tablero, codigos,resultados4[0]);
+								if(err4){
+									funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err4}));
+								}
+								else{
+									fr.enviaTableroMachos(respuesta,idSimulacion,idUsuario,tablero, codigos,resultados4[0]);
+								}
 							});							
 						}					
 					});
@@ -190,9 +214,13 @@ var actualizaListaEspecies = module.exports.actualizaListaEspecies = function(pe
 				}
 				else{
 					ClaseAsync.series([function(retrollamada3){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada3)}],function (err3, resultados3){
-						fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados2[1], resultados3[0]);
-					});	
-							
+						if(err3){
+							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
+						}
+						else{
+							fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados2[1], resultados3[0]);
+						}	
+					});								
 				}	
 			});
 		}

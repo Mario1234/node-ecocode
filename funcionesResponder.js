@@ -49,9 +49,9 @@ var enviaSemillasHembras = module.exports.enviaSemillasHembras = function(respue
     }        
 }
 
-var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta, idSimulacion, idUsuario, tablero, indivaux){	
+var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta, idSimulacion, idUsuario, tablero, codigos, indivaux){	
 	var iniMachos = "<html><head></head><body onload='funcionMachos();'><script>";
-    var machosHTML = iniMachos+this.codigosEspecie[0]+"</script><p id='idTablero'>"+JSON.stringify(tablero)+"</p>";
+    var machosHTML = iniMachos+codigos[0]+"</script><p id='idTablero'>"+JSON.stringify(tablero)+"</p>";
     machosHTML+="<form id='idDecisionMachosForm' action='/decisionmachos' method='post'>";
 	machosHTML+="<ul id='idMachos'>";
     if(indivaux!=null){
