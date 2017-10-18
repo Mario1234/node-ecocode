@@ -18,6 +18,7 @@ function quitaFuncionesProhibidas(cadenaCodigo) {
 //------------------------PUBLICAS----------------------------------
 
 var enviaSemillasHembras = module.exports.enviaSemillasHembras = function(respuesta, idSimulacion, idUsuario, codigosEspecie, indivaux){
+    var codHembras="";
     if(codigosEspecie[0]==null){
         codigosEspecie[0]="";
     }	
@@ -29,11 +30,12 @@ var enviaSemillasHembras = module.exports.enviaSemillasHembras = function(respue
         codigosEspecie[1]="";
     }	
     else{
+        codHembras = codigosEspecie[1].replace(/&#39;/g,"'");
         codigosEspecie[1] = quitaFuncionesProhibidas(codigosEspecie[1]);
         codigosEspecie[1] = codigosEspecie[1].replace(/'/g,"&#39;"); 
-    }
+    }    
 	var iniHembras = "<html><head></head><body onload='funcionHembras();'><script>";
-	var hembrasHTML = iniHembras+codigosEspecie[1]+"</script><form id='idDecisionHembrasForm' action='/decisionhembras' method='post'>";
+	var hembrasHTML = iniHembras+codHembras+"</script><form id='idDecisionHembrasForm' action='/decisionhembras' method='post'>";
 	hembrasHTML+="<input type='hidden' id='idCodigoMacho' name='nameCodigoMacho' value='"+codigosEspecie[0]+"'>";
 	hembrasHTML+="<input type='hidden' id='idCodigoHembra' name='nameCodigoHembra' value='"+codigosEspecie[1]+"'>";
 	hembrasHTML+="<ul id='idHembras'>";
@@ -43,15 +45,19 @@ var enviaSemillasHembras = module.exports.enviaSemillasHembras = function(respue
             //manda la decision de aceptar semilla como no aceptar por defecto
             hembrasHTML+="<li><input type='hidden' id='m"+indivaux[i].id+"' name='m"+indivaux[i].id+"' value='NO'>"+indivaux[i].semilla+"</li>";
             hembrasHTML+="<li><input type='hidden' id='d"+indivaux[i].id+"' name='d"+indivaux[i].id+"' value='N'>"+indivaux[i].semilla+"</li>";
-        };
-        hembrasHTML+="</ul></form></body></html>";
-        enviaCadenaHTML(respuesta,hembrasHTML);
-    }        
+        };        
+    }     
+    hembrasHTML+="</ul></form></body></html>";
+    enviaCadenaHTML(respuesta,hembrasHTML);   
 }
 
 var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta, idSimulacion, idUsuario, tablero, codigos, indivaux){	
-	var iniMachos = "<html><head></head><body onload='funcionMachos();'><script>";
-    var machosHTML = iniMachos+codigos[0]+"</script><p id='idTablero'>"+JSON.stringify(tablero)+"</p>";
+    if(codigos[0]==null){
+        codigos[0]="";
+    }	
+    var codMachos = codigos[0].replace(/&#39;/g,"'");
+    var iniMachos = "<html><head></head><body onload='funcionMachos();'><script>";
+    var machosHTML = iniMachos+codMachos+"</script><p id='idTablero'>"+JSON.stringify(tablero)+"</p>";
     machosHTML+="<form id='idDecisionMachosForm' action='/decisionmachos' method='post'>";
 	machosHTML+="<ul id='idMachos'>";
     if(indivaux!=null){
@@ -60,10 +66,10 @@ var enviaTableroMachos = module.exports.enviaTableroMachos = function(respuesta,
             //manda la decision de aceptar semilla como no aceptar por defecto
             machosHTML+="<li><input type='hidden' id='m"+indivaux[i].id+"' name='m"+indivaux[i].id+"' value='NO'></li>";
             machosHTML+="<li><input type='hidden' id='s"+indivaux[i].id+"' name='s"+indivaux[i].id+"' value=''></li>";
-        };
-        machosHTML+="</ul></form></body></html>";
-        enviaCadenaHTML(respuesta,machosHTML);
+        };        
     }       
+    machosHTML+="</ul></form></body></html>";
+    enviaCadenaHTML(respuesta,machosHTML);
 }
 
 var enviaMensaje = module.exports.enviaMensaje = function(err,html_cadena) {

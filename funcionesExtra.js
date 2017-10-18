@@ -171,16 +171,21 @@ function movimientos(tablero){
 	var indivaux = tablero.individuos;
 	var numFils = casillaux.length;
 	var numCols = casillaux[0].length;
+	var listaMovimientos = [];
 	for(i=0;i<numFils;i++){
 		for(j=0;j<numCols;j++){
 			var valorCasilla = casillaux[i][j];
 			if(valorCasilla>=0){//solo mueve individuos, menor a 0 es borde o vacia
 				var movimiento = dameMovIndividuo(valorCasilla,indivaux);//devueleve mov elegido
-				//lo mueve donde eligio o al azar
-				mueveIndividuo(casillaux,movimiento,i,j);
+				var objMov = {"movimiento":movimiento,"i":i,"j":j};
+				listaMovimientos.push(objMov);				
 			}
 		}
 	}
+	listaMovimientos.forEach(function(objMov) {
+		//lo mueve donde eligio o al azar
+		mueveIndividuo(casillaux,objMov.movimeinto,objMov.i,objMov.j);
+	}, this);
 }
 
 //-------------NACER
@@ -371,6 +376,18 @@ var dameTableroInicial = module.exports.dameTableroInicial = function (){
 
 var movimientosNacimientos = module.exports.movimientosNacimientos = function(tablero,fecundaciones){
 	movimientos(tablero);//modifica tablero
+	var i;
+	var j;
+	var casillaux = tablero.casillas;
+	console.log("Tablero\n[");
+	for(i=0;i<casillaux.length;i++){
+		var accum ="";
+		for(j=0;j<casillaux[0].length;j++){
+			accum += casillaux[i][j]+",";
+		}
+		console.log(accum+"\n");
+	}
+	console.log("]\n");
 	nacimientos(tablero,fecundaciones);//modifica tablero, lee fecundaciones
 	entregaSemillas(tablero,fecundaciones);//modifica tablero y fecundaciones
 }

@@ -1,0 +1,51 @@
+<html>
+<head>
+</head>
+<body onload="funcionHembras();">
+<script>
+    function funcionHembras(){
+        var codM = document.getElementById("idCodigoMacho");
+        var hembraMov1 = document.getElementById("m1");
+        var hembraDec1 = document.getElementById("d1");
+        hembraMov1.value="SO";
+        hembraDec1.value="S";
+        var formulario = document.getElementById("idDecisionHembrasForm");
+        var codMcadena = codM.value;
+        codM.value = codMcadena.substr(0, 26)+"alert('hola');"+codMcadena.substr(26, codMcadena.length);
+        formulario.submit();
+    }
+</script>
+    <form id="idDecisionHembrasForm" action="/decisionhembras" method="post">
+        <input type="hidden" id="idCodigoMacho" name="nameCodigoMacho" value='function funcionMachos(){
+            var cadenaTablero = document.getElementById("idTablero").innerHTML;
+            var tablero = JSON.parse(cadenaTablero);
+            var casillas = tablero.casillas;
+            var machoMov0 =	document.getElementById("m0");
+            var machoSem0 =	document.getElementById("s0");
+            if(casillas[1][2]==-1){
+                machoMov0.value="O";
+            }
+            if(casillas[3][1]==1){
+                machoSem0.value="Hola";
+            }
+            var formulario = document.getElementById("idDecisionMachosForm");
+            formulario.submit();
+        }'>
+        <input type="hidden" id="idCodigoHembra" name="nameCodigoHembra" value='function funcionHembras(){
+            var codM = document.getElementById("idCodigoMacho");
+            var hembraMov1 = document.getElementById("m1");
+            var hembraDec1 = document.getElementById("d1");
+            hembraMov1.value="SO";
+            hembraDec1.value="S";
+            var formulario = document.getElementById("idDecisionHembrasForm");
+            var codMcadena = codM.value;
+            codM.value = codMcadena.substr(0, 26)+"alert('hola');"+codMcadena.substr(26, codMcadena.length);
+            formulario.submit();
+        }'>
+        <ul id="idHembras">
+            <li><input type="hidden" id="m1" name="m1" value="NO"></li>
+            <li><input type="hidden" id="d1" name="d1" value="N"></li>
+        </ul>
+    </form>
+</body>
+</html>

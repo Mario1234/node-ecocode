@@ -1,0 +1,30 @@
+<html>
+<head>
+</head>
+<body onload='funcionMachos();'>
+<script>
+    function funcionMachos(){
+        var cadenaTablero = document.getElementById("idTablero").innerHTML;
+        var tablero = JSON.parse(cadenaTablero);
+        var casillas = tablero.casillas;
+        var machoMov0 =	document.getElementById("m0");
+        var machoSem0 =	document.getElementById("s0");
+        if(casillas[1][2]==-1){
+            machoMov0.value="O";
+        }
+        if(casillas[3][1]==1){
+            machoSem0.value="Hola";
+        }
+        var formulario = document.getElementById("idDecisionMachosForm");
+        formulario.submit();
+    }
+</script>
+    <p id='idTablero'>{"casillas":[[-2,-2,-2,-2,-2,-2,-2],[-2,-1,-1,0,-1,-1,-2],[-2,-1,-1,-1,-1,-1,-2],[-2,1,-1,-1,-1,2,-2],[-2,-1,-1,-1,-1,-1,-2],[-2,-1,-1,3,-1,-1,-2],[-2,-2,-2,-2,-2,-2,-2]],"individuos":[{"id":0,"especie":0,"sexo":"M","movimiento":"SO","decision":"N","semilla":""},{"id":1,"especie":0,"sexo":"H","movimiento":"SO","semilla":""},{"id":2,"especie":1,"sexo":"M","movimiento":"NE","decision":"N","semilla":""},{"id":3,"especie":1,"sexo":"H","movimiento":"NO","decision":"N","semilla":""}]}</p>
+    <form id='idDecisionMachosForm' action='/decisionmachos' method='post'>
+        <ul id='idMachos'>
+            <li><input type='hidden' id='m0' name='m0' value='NO'></li>
+            <li><input type='hidden' id='s0' name='s0' value='NO'></li>
+        </ul>
+    </form>
+</body>
+</html>

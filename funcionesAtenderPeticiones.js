@@ -26,9 +26,9 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 			var listaEspeciesSimulacion = resultados[0];
 			var fecundaciones = resultados[1];
 			//aniade las funciones de manera ordenada a una lista de funciones
-			for(i=0;i<listaEspeciesSimulacion.length;i++){
-				var listaFuncionesLambda = [];
-				var idUsuarioSimulacion = listaEspeciesSimulacion[i];
+			var listaFuncionesLambda = [];
+			for(i=0;i<listaEspeciesSimulacion.length;i++){				
+				var idUsuarioSimulacion = listaEspeciesSimulacion[i].ID_ESPECIE;
 				//se marcan como no preparados a que el servidor ejecute el siguiente paso
 				fbd.marcarPreparadoONoBBDD(respuesta,idUsuarioSimulacion,0);
 				//ENCOLA: pide el tablero con decisiones del paso anterior de cada jugador
@@ -36,7 +36,7 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 			}
 			//ejecuta de manera ordenada el tratamiento de tableros de cada jugador
 			ClaseAsync.series(listaFuncionesLambda,function(err2,resultados2){
-				var tableroGlobal = {};
+				var tableroGlobal = {"casillas":[],"individuos":[]};
 				//actualiza de manera ordenada el tablero global con lo devuelto por la lista de lambdas, los tableros
 				//recorre los indivs del primer tab
 				var gente = resultados2[0].individuos;//coge los individuos de ese tablero, son el mismo num de indivs para todos los tableros
@@ -117,8 +117,10 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
 						}
 						else{
-							peticion.session.fase = 0;
+							peticion.session.fase = 0;fase=0;
 							peticion.session.paso = paso+1;
+							fbd.incrementaPasoSimulacionBBDD(idSimulacion);
+							fbd.ponFaseSimulacionBBDD(idSimulacion,fase,function(){});
 							respuesta.redirect("/actualizaListaEspecies");//manda al usuario a esperar a que los demas terminen
 						}					
 					});
@@ -162,7 +164,7 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 					var tablero = resultados2[1];
 					funcionesExtra.dameTableroActualizadoUsuario(peticion,resultados2[0],tablero,"d");
 					var tableroString = JSON.stringify(tablero);					
-					fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tableroString);
+					fbd.actualizaTableroPasoBBDD(respuesta,idSimulacion, idUsuario, paso, tableroString,function(){});
 					var nuevosCodigosEspecie=[];
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoMacho);
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoHembra);
@@ -177,7 +179,11 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 						else{
 							var codigos = resultados3[0];
 							peticion.session.fase = 1;
-							ClaseAsync.series([function(retrollamada4){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada4)}],function (err4, resultados4){
+							fase=1;
+							ClaseAsync.series([
+								function(retrollamada4){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada4)},
+								function(retrollamada4){fbd.ponFaseSimulacionBBDD(idSimulacion,fase,retrollamada4)}],
+								function (err4, resultados4){
 								if(err4){
 									funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err4}));
 								}
