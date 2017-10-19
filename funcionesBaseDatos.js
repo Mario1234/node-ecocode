@@ -156,8 +156,17 @@ var dameListaSimulacionesActivasBBDD = module.exports.dameListaSimulacionesActiv
 	}	
 }
 
-var creaPasoUsuarioBBDD = module.exports.creaPasoUsuarioBBDD = function(respuesta, idSimulacion, paso, idUsuario, tableroString, codM, codH, retrollamada){
+var creaPasoUsuarioBBDD = module.exports.creaPasoUsuarioBBDD = function(paramMap, retrollamada){
+	var respuesta = paramMap.res;
+	var idSimulacion = paramMap.idSim;
+	var paso = paramMap.paso;
+	var idUsuario = paramMap.idUsu;
+	var tableroString = paramMap.tab;
+	var codM = paramMap.codM;
+	var codH = paramMap.codH;
 	var sqlite3 = require("sqlite3").verbose();
+	if(codM==null)codM="";
+	if(codH==null)codH="";
 	var insertSQL = "INSERT OR IGNORE INTO PASO_SIMULACION (ID_SIMULACION, PASO, ID_ESPECIE, TABLERO, HECHA_DECISION_HEMBRAS, CODIGO_MACHO, CODIGO_HEMBRA) VALUES (?, ?, ?, ?, ?, ?, ?)";
 	console.log(insertSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
@@ -176,7 +185,13 @@ var creaPasoUsuarioBBDD = module.exports.creaPasoUsuarioBBDD = function(respuest
 //consigue la lista de jugadores de la simulacion
 var dameListaEspeciesSimulacionBBDD = module.exports.dameListaEspeciesSimulacionBBDD = function(idSimulacion, retrollamada){
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT ID_ESPECIE, nombre, PREPARADO FROM PASO_SIMULACION INNER JOIN USUARIO ON ID_ESPECIE=id WHERE ID_SIMULACION=?";	
+	var consultaSQL = "SELECT ID_ESPECIE, nombre, PREPARADO ";
+	consultaSQL +="FROM PASO_SIMULACION ";
+	consultaSQL +="INNER JOIN USUARIO ON ID_ESPECIE=id ";	
+	consultaSQL +="INNER JOIN SIMULACION ON ";
+	consultaSQL +="(SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION ";
+	consultaSQL +="AND SIMULACION.PASO = PASO_SIMULACION.PASO) ";
+	consultaSQL +="WHERE PASO_SIMULACION.ID_SIMULACION=?";
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");		
 	console.log(consultaSQL);
 	baseDatos.all(consultaSQL,[idSimulacion], function(err1, rows) {
@@ -279,7 +294,12 @@ var dameCodigosEspecieBBDD = module.exports.dameCodigosEspecieBBDD = function(id
 var dameIndividuosEspecieSexoBBDD = module.exports.dameIndividuosEspecieSexoBBDD = function(idSimulacion, idUsuario, sexo, retrollamada){
 	var indivaux=[];
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT TABLERO FROM PASO_SIMULACION INNER JOIN SIMULACION ON SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=?";
+	var consultaSQL = "SELECT TABLERO";
+	consultaSQL+=" FROM PASO_SIMULACION";
+	consultaSQL+=" INNER JOIN SIMULACION ON";
+		consultaSQL+=" (SIMULACION.ID_SIMULACION = PASO_SIMULACION.ID_SIMULACION";
+		consultaSQL+=" AND SIMULACION.PASO = PASO_SIMULACION.PASO)";
+	consultaSQL+=" WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -345,7 +365,10 @@ var actualizaTableroPasoBBDD = module.exports.actualizaTableroPasoBBDD = functio
 	baseDatos.close();
 }
 
-var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimulacion, idUsuario, paso, retrollamada){
+var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(paramMap, retrollamada){
+	var idSimulacion = paramMap.idSimulacion;
+	var idUsuario = paramMap.idUsuario;
+	var paso = paramMap.paso;
 	var sqlite3 = require("sqlite3").verbose();
 	var consultaSQL = "SELECT TABLERO FROM PASO_SIMULACION WHERE PASO_SIMULACION.ID_SIMULACION=? AND PASO_SIMULACION.ID_ESPECIE=? AND PASO_SIMULACION.PASO=?";
 	console.log(consultaSQL);
@@ -370,7 +393,10 @@ var dameTableroPasoBBDD = module.exports.dameTableroPasoBBDD = function(idSimula
 	}
 }
 
-var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimulacion, idUsuario, paso,retrollamada){
+var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(paramMap,retrollamada){
+	var idSimulacion = paramMap.idSimulacion;
+	var idUsuario = paramMap.idUsuario;
+	var paso = paramMap.paso;
 	var codMach=null;
 	var codHemb=null;	
 	var listaCodigos=[codMach,codHemb];
@@ -391,8 +417,8 @@ var dameCodigosPasoBBDD = module.exports.dameCodigosPasoBBDD = function(idSimula
 			}
 			listaCodigos[0]=codMach;
 			listaCodigos[1]=codHemb;
-			retrollamada(null,listaCodigos);
 			baseDatos.close();
+			retrollamada(null,listaCodigos);			
 		});	
 	});
 	if(baseDatos==null){

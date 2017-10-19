@@ -26,16 +26,17 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 			var listaEspeciesSimulacion = resultados[0];
 			var fecundaciones = resultados[1];
 			//aniade las funciones de manera ordenada a una lista de funciones
-			var listaFuncionesLambda = [];
+			var listaParamMap = [];
 			for(i=0;i<listaEspeciesSimulacion.length;i++){				
-				var idUsuarioSimulacion = listaEspeciesSimulacion[i].ID_ESPECIE;
+				var idUsuario = listaEspeciesSimulacion[i].ID_ESPECIE;
 				//se marcan como no preparados a que el servidor ejecute el siguiente paso
-				fbd.marcarPreparadoONoBBDD(respuesta,idUsuarioSimulacion,0);
-				//ENCOLA: pide el tablero con decisiones del paso anterior de cada jugador
-				listaFuncionesLambda.push(function(retrollamada3){fbd.dameTableroPasoBBDD(idSimulacion, idUsuarioSimulacion, paso-1,retrollamada3)});							
+				fbd.marcarPreparadoONoBBDD(respuesta,idUsuario,0);
+				//encapsulamos todos los parametros en un solo objeto para usar map
+				var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso-1};
+				listaParamMap.push(paramMap);						
 			}
 			//ejecuta de manera ordenada el tratamiento de tableros de cada jugador
-			ClaseAsync.series(listaFuncionesLambda,function(err2,resultados2){
+			ClaseAsync.map(listaParamMap,fbd.dameTableroPasoBBDD,function(err2,resultados2){
 				var tableroGlobal = {"casillas":[],"individuos":[]};
 				//actualiza de manera ordenada el tablero global con lo devuelto por la lista de lambdas, los tableros
 				//recorre los indivs del primer tab
@@ -52,22 +53,19 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 					fbd.actualizaFecundacionSimulacionBBDD(idSimulacion,fecundacion);
 				}				
 				var tableroStringGlobal = JSON.stringify(tableroGlobal);
-				var listaFuncionesLambda2 = [];		
-				for(i=0;i<listaEspeciesSimulacion.length;i++){
-					//ENCOLA: recoge los codigos de cada jugador del paso anterior
-					listaFuncionesLambda2.push(function(retrollamada3){fbd.dameCodigosPasoBBDD(idSimulacion,idUsuarioSimulacion,paso-1,retrollamada3)});
-				}
 				//ejecuta en serie la obtencion de codigos de cada jugador, lo devuelve ordenado
-				ClaseAsync.series(listaFuncionesLambda2,function(err3,resultados3){
-					var listaFuncionesLambda3 = [];
+				ClaseAsync.map(listaParamMap,fbd.dameCodigosPasoBBDD,function(err3,resultados3){
+					var listaParamMap3 = [];
 					for(i=0;i<listaEspeciesSimulacion.length;i++){
-						var idUsuarioSimulacion = listaEspeciesSimulacion[i];
-						//ENCOLA: se crea el siguiente paso para esa simu y ese usuario, guardando el tablero con las acciones de este paso realizadas
-						listaFuncionesLambda3.push(function(retrollamada3){fbd.creaPasoUsuarioBBDD(respuesta,
-							idSimulacion,paso,idUsuarioSimulacion,tableroStringGlobal,resultados3[i][0],resultados3[i][1],retrollamada3)});
+						var idUsuario3 = listaEspeciesSimulacion[i].ID_ESPECIE;
+						var codM1=resultados3[i][0];
+						var codH1=resultados3[i][1];
+						var paramMap = {"res":respuesta,"idSim":idSimulacion,"paso":paso,"idUsu":idUsuario3,
+							"tab":tableroStringGlobal,"codM":codM1,"codH":codH1};
+						listaParamMap3.push(paramMap);
 					}				
 					//ejecuta en paralelo la creacion del sig paso, el mismo para cada jugador
-					ClaseAsync.parallel(listaFuncionesLambda3,function(err4,resultados4){
+					ClaseAsync.map(listaParamMap3,fbd.creaPasoUsuarioBBDD,function(err4,resultados4){
 						retrollamada();
 					});
 				});								
@@ -97,10 +95,12 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
 	function (err, resultados){
 		if(fase==1 && resultados[0]==1 && resultados[1]==paso && err==null){
+			//encapsulamos todos los parametros en un solo objeto porque se usa map despues con dameTableroPasoBBDD
+			var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
 			//recoge la lista de machos y el tablero de este paso
 			ClaseAsync.parallel([
 				function(retrollamada2){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada2)},
-				function(retrollamada2){fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso,retrollamada2)}],
+				function(retrollamada2){fbd.dameTableroPasoBBDD(paramMap,retrollamada2)}],
 			function(err2,resultados2){
 				if(err2){
 					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
@@ -153,9 +153,11 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
 	function (err, resultados){
 		if(fase==0 && resultados[0]==0 && resultados[1]==paso && err==null){
+			//encapsulamos todos los parametros en un solo objeto porque se usa map despues con dameTableroPasoBBDD
+			var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
 			ClaseAsync.parallel([
 				function(retrollamada2){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada2)},
-				function(retrollamada2){fbd.dameTableroPasoBBDD(idSimulacion, idUsuario, paso,retrollamada2)}],
+				function(retrollamada2){fbd.dameTableroPasoBBDD(paramMap,retrollamada2)}],
 			function(err2,resultados2){
 				if(err2){
 					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
@@ -168,9 +170,10 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 					var nuevosCodigosEspecie=[];
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoMacho);
 					nuevosCodigosEspecie.push(peticion.body.nameCodigoHembra);
+					var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
 					//coge los codigos del paso anterior, evolucionan los codigos del paso actual y  despues envia tablero y codigos paso anterior a los machos
 					ClaseAsync.parallel([
-						function(retrollamada3){fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso,retrollamada3)},
+						function(retrollamada3){fbd.dameCodigosPasoBBDD(paramMap,retrollamada3)},
 						function(retrollamada3){fbd.actualizaCodigosPasoBBDD(idSimulacion, idUsuario, paso, nuevosCodigosEspecie,retrollamada3)}],
 					function(err3,resultados3){
 						if(err3){
@@ -210,10 +213,11 @@ var actualizaListaEspecies = module.exports.actualizaListaEspecies = function(pe
 	//si empieza/continua, recoge codigos especie, ejecuta el paso anterior y enviaSemillasHembras y sino pide la lista de especies de nuevo
 	ClaseAsync.series([function(retrollamada1){fbd.miraSiEmpiezaSimulacionBBDD(idSimulacion,retrollamada1)}],function(err1,resultados1){
 		if(resultados1[0]){
+			var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
 			//ejecuta el paso anterior var tableroResultadoPaso 
 			ClaseAsync.series([
 				function(retrollamada2){ejecutaPaso(respuesta,idSimulacion,paso,retrollamada2)},
-				function(retrollamada2){fbd.dameCodigosPasoBBDD(idSimulacion,idUsuario,paso,retrollamada2)}
+				function(retrollamada2){fbd.dameCodigosPasoBBDD(paramMap,retrollamada2)}
 			],function(err2,resultados2){	
 				if(err2){
 					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
@@ -261,7 +265,9 @@ var entrarSimulacion = module.exports.entrarSimulacion = function(peticion,respu
 	var tableroString = JSON.stringify(funcionesExtra.dameTableroInicial());
 	ClaseAsync.series([function(retrollamada){fbd.dameCodigosEspecieBBDD(idUsuario,retrollamada)}],
 		function (err, resultados){
-			ClaseAsync.series([function(retrollamada2){fbd.creaPasoUsuarioBBDD(respuesta,idSimulacion,0,idUsuario,tableroString,resultados[0][0],resultados[0][1],retrollamada2)},
+			var paramMap = {"res":respuesta,"idSim":idSimulacion,"paso":0,"idUsu":idUsuario,
+			"tab":tableroString,"codM":resultados[0][0],"codH":resultados[0][1]};
+			ClaseAsync.series([function(retrollamada2){fbd.creaPasoUsuarioBBDD(paramMap,retrollamada2)},
 				function(retrollamada3){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada3)}],
 				function (err2, resultados2){
 					if(err){
