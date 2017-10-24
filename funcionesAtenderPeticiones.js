@@ -6,6 +6,8 @@ var funcionesArchivos = require( __dirname + '/funcionesArchivos.js');
 //CARGA DE LIBRERIAS EXTERNAS CON REQUIRE
 var ClaseAsync = require("async");//para trabajar con semaforos de procesos asincronos
 
+var seguroSemaforo = false;//se usa para asegurar que solo accede un cliente a un recurso
+
 //------------------------PRIVADAS----------------------------------
 
 //recorre todos los usuarios de la simulacion y coge sus tableros con sus respuestas
@@ -13,26 +15,38 @@ var ClaseAsync = require("async");//para trabajar con semaforos de procesos asin
 //marca los usuarios como no preparados
 //mueve gente, realiza nacimientos
 //
-function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
-	var i;
-	if(paso==0){
-		retrollamada();
-	}
-	else{
-		ClaseAsync.series([
-			function(retrollamada2){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada2)},
-			function(retrollamada2){fbd.dameFecundacionesSimulacionBBDD(idSimulacion,retrollamada2)}
-		],function(err,resultados){
-			var listaEspeciesSimulacion = resultados[0];
-			var fecundaciones = resultados[1];
+function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){	
+	ClaseAsync.series([
+		function(retrollamada2){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada2)},
+		function(retrollamada2){fbd.dameFecundacionesSimulacionBBDD(idSimulacion,retrollamada2)}
+	],function(err,resultados){
+		var listaEspeciesSimulacion = resultados[0];
+		var fecundaciones = resultados[1];
+		var i;
+		//marca todos los usuarios como no preparados
+		for(i=0;i<listaEspeciesSimulacion.length;i++){	
+			var idUsuario = listaEspeciesSimulacion[i].ID_ESPECIE;	
+			//se marca este usuario como no preparado a que el servidor ejecute el siguiente paso
+			fbd.marcarPreparadoONoBBDD(respuesta,idUsuario,0);
+		}
+		
+		//si es entrar en la simulacion
+		if(paso<0){
+			for(i=0;i<listaEspeciesSimulacion.length;i++){	
+				var idUsuario = listaEspeciesSimulacion[i].ID_ESPECIE;
+				creaPasoInicial(respuesta,idSimulacion,idUsuario,0,function(){});	
+			}
+			fbd.incrementaPasoSimulacionBBDD(idSimulacion);
+			retrollamada();
+		}
+		//si es algun paso de la simulacion
+		else{
 			//aniade las funciones de manera ordenada a una lista de funciones
 			var listaParamMap = [];
 			for(i=0;i<listaEspeciesSimulacion.length;i++){				
-				var idUsuario = listaEspeciesSimulacion[i].ID_ESPECIE;
-				//se marcan como no preparados a que el servidor ejecute el siguiente paso
-				fbd.marcarPreparadoONoBBDD(respuesta,idUsuario,0);
+				var idUsuario = listaEspeciesSimulacion[i].ID_ESPECIE;							
 				//encapsulamos todos los parametros en un solo objeto para usar map
-				var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso-1};
+				var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
 				listaParamMap.push(paramMap);						
 			}
 			//ejecuta de manera ordenada el tratamiento de tableros de cada jugador
@@ -60,18 +74,43 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 						var idUsuario3 = listaEspeciesSimulacion[i].ID_ESPECIE;
 						var codM1=resultados3[i][0];
 						var codH1=resultados3[i][1];
-						var paramMap = {"res":respuesta,"idSim":idSimulacion,"paso":paso,"idUsu":idUsuario3,
+						var paramMap3 = {"res":respuesta,"idSim":idSimulacion,"paso":paso+1,"idUsu":idUsuario3,
 							"tab":tableroStringGlobal,"codM":codM1,"codH":codH1};
-						listaParamMap3.push(paramMap);
+						listaParamMap3.push(paramMap3);
 					}				
 					//ejecuta en paralelo la creacion del sig paso, el mismo para cada jugador
 					ClaseAsync.map(listaParamMap3,fbd.creaPasoUsuarioBBDD,function(err4,resultados4){
+						fbd.incrementaPasoSimulacionBBDD(idSimulacion);
 						retrollamada();
 					});
 				});								
 			});			
-		});
-	}	
+		}
+	});
+}
+
+function creaPasoInicial(respuesta, idSimulacion, idUsuario, paso, retrollamadaParam){
+	//crea el paso0 para el jugador que se acaba de unir
+	var tableroString = JSON.stringify(funcionesExtra.dameTableroInicial());	
+	ClaseAsync.series([function(retrollamada){fbd.dameCodigosEspecieBBDD(idUsuario,retrollamada)}],
+		function (err, resultados){
+			var paramMap = {"res":respuesta,"idSim":idSimulacion,"paso":paso,"idUsu":idUsuario,
+				"tab":tableroString,"codM":resultados[0][0],"codH":resultados[0][1]};
+			ClaseAsync.series([function(retrollamada3){fbd.creaPasoUsuarioBBDD(paramMap,retrollamada3)}],
+				function (err2, resultados2){
+					if(err){
+						retrollamadaParam(err);
+					}
+					else if(err2){
+						retrollamadaParam(err2);
+					}
+					else{
+						retrollamadaParam(null);
+					}
+				}
+			);
+		}
+	);
 }
 
 //------------------------PUBLICAS----------------------------------
@@ -90,8 +129,8 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 	var fase = peticion.session.fase;
 	//solo si la simulacion esta en la fase 1 que la de machos, la sesion del jugador esta tambien en fase 1
 	//y el paso del jugador es el de la simulacion
-	ClaseAsync.parallel([
-		function(retrollamada1){fbd.dameFaseSimulacionBBDD(idSimulacion,retrollamada1)},
+	ClaseAsync.series([
+		function(retrollamada1){fbd.dameFaseSimulacionBBDD(idSimulacion,idUsuario,retrollamada1)},
 		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
 	function (err, resultados){
 		if(fase==1 && resultados[0]==1 && resultados[1]==paso && err==null){
@@ -116,11 +155,9 @@ var decisionMachos = module.exports.decisionMachos = function(peticion,respuesta
 						if(err3){
 							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
 						}
-						else{
-							peticion.session.fase = 0;fase=0;
-							peticion.session.paso = paso+1;
-							fbd.incrementaPasoSimulacionBBDD(idSimulacion);
-							fbd.ponFaseSimulacionBBDD(idSimulacion,fase,function(){});
+						else{													
+							//este usuario esta preparado a que el servidor ejecute el siguiente paso
+							fbd.marcarPreparadoONoBBDD(respuesta,idUsuario,1);
 							respuesta.redirect("/actualizaListaEspecies");//manda al usuario a esperar a que los demas terminen
 						}					
 					});
@@ -148,11 +185,11 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 	var fase = peticion.session.fase;
 	//solo si la simulacion esta en la fase 0 que la de hembras, la sesion del jugador esta tambien en fase 0
 	//y el paso del jugador es el de la simulacion
-	ClaseAsync.parallel([
-		function(retrollamada1){fbd.dameFaseSimulacionBBDD(idSimulacion,retrollamada1)},
+	ClaseAsync.series([
+		function(retrollamada1){fbd.dameFaseSimulacionBBDD(idSimulacion,idUsuario,retrollamada1)},
 		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
 	function (err, resultados){
-		if(fase==0 && resultados[0]==0 && resultados[1]==paso && err==null){
+		if(fase==0 && resultados[0]==0 && resultados[1]==paso && err==null){			
 			//encapsulamos todos los parametros en un solo objeto porque se usa map despues con dameTableroPasoBBDD
 			var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
 			ClaseAsync.parallel([
@@ -180,17 +217,16 @@ var decisionHembras = module.exports.decisionHembras = function(peticion,respues
 							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
 						}
 						else{
-							var codigos = resultados3[0];
+							var codigos = resultados3[0];	
 							peticion.session.fase = 1;
-							fase=1;
+							fase=1;						
 							ClaseAsync.series([
-								function(retrollamada4){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada4)},
-								function(retrollamada4){fbd.ponFaseSimulacionBBDD(idSimulacion,fase,retrollamada4)}],
+								function(retrollamada4){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "M",retrollamada4)}],
 								function (err4, resultados4){
 								if(err4){
 									funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err4}));
 								}
-								else{
+								else{								
 									fr.enviaTableroMachos(respuesta,idSimulacion,idUsuario,tablero, codigos,resultados4[0]);
 								}
 							});							
@@ -211,29 +247,57 @@ var actualizaListaEspecies = module.exports.actualizaListaEspecies = function(pe
 	var paso = peticion.session.paso;
 	//mira si empieza/continua la simulacion
 	//si empieza/continua, recoge codigos especie, ejecuta el paso anterior y enviaSemillasHembras y sino pide la lista de especies de nuevo
-	ClaseAsync.series([function(retrollamada1){fbd.miraSiEmpiezaSimulacionBBDD(idSimulacion,retrollamada1)}],function(err1,resultados1){
-		if(resultados1[0]){
-			var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};
-			//ejecuta el paso anterior var tableroResultadoPaso 
-			ClaseAsync.series([
-				function(retrollamada2){ejecutaPaso(respuesta,idSimulacion,paso,retrollamada2)},
-				function(retrollamada2){fbd.dameCodigosPasoBBDD(paramMap,retrollamada2)}
-			],function(err2,resultados2){	
-				if(err2){
-					funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
-				}
-				else{
-					ClaseAsync.series([function(retrollamada3){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada3)}],function (err3, resultados3){
-						if(err3){
-							funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
-						}
-						else{
-							fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados2[1], resultados3[0]);
-						}	
-					});								
-				}	
-			});
+	ClaseAsync.series([
+		function(retrollamada1){fbd.miraSiListosSigPasoBBDD(idSimulacion,retrollamada1)},
+		function(retrollamada1){fbd.damePasoSimulacionBBDD(idSimulacion,retrollamada1)}],
+	function(err1,resultados1){
+		//si estan todos listos o ya se les puso como no preparados y se incremento el paso
+		//entonces ejecuta el paso o enviasemillashembras, respestivamente
+		if(!seguroSemaforo && (resultados1[0] || (resultados1[1]==paso+1))){
+			//si el paso de la sim es el paso de sim que tiene este usuario en su sesion
+			//entonces estan todos listos asi que ejecuta el paso
+			if(!seguroSemaforo && resultados1[1]==paso){
+				seguroSemaforo=true;
+				//ejecuta el paso anterior(todas las decisiones recien enviadas) 
+				ClaseAsync.series([
+					function(retrollamada2){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada2)},
+					function(retrollamada2){ejecutaPaso(respuesta,idSimulacion,paso,retrollamada2)}],
+				function(err2,resultados2){
+					if(err2){
+						funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
+					}
+					else{
+						seguroSemaforo=false;
+						funcionesArchivos.leeArchivo( __dirname + "\\simulacionIni.html", fr.enviaListaEspeciesSimulacion.bind({respuesta: respuesta, listaEspecies:resultados2[0]}) );
+					}
+				});
+			}
+			//si el paso de la simulacion ha incrementado y el paso que tiene en sesion este usuario no
+			//entonces incrementarlo y enviarle semillas a sus hembras para que decidan, fase0
+			else{
+				var paramMap = {"idSimulacion":idSimulacion,"idUsuario":idUsuario,"paso":paso};				
+				ClaseAsync.series([
+					function(retrollamada2){fbd.dameCodigosPasoBBDD(paramMap,retrollamada2)}
+				],function(err2,resultados2){	
+					if(err2){
+						funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
+					}
+					else{
+						ClaseAsync.series([function(retrollamada3){fbd.dameIndividuosEspecieSexoBBDD(idSimulacion, idUsuario, "H",retrollamada3)}],function (err3, resultados3){
+							if(err3){
+								funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err3}));
+							}
+							else{
+								peticion.session.fase = 0;
+								peticion.session.paso = paso+1;							
+								fr.enviaSemillasHembras(respuesta, idSimulacion, idUsuario, resultados2[0], resultados3[0]);
+							}	
+						});								
+					}	
+				});
+			}			
 		}
+		//si todavia no estan todos listos ni se ha incrementado el paso de la simu, seguir esperando
 		else{
 			//pide la lista de especies de la simulacion y la muestra
 			ClaseAsync.series([function(retrollamada2){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada2)}],function(err2,resultados2){
@@ -257,32 +321,21 @@ var marcarPreparado = module.exports.marcarPreparado = function(peticion,respues
 var entrarSimulacion = module.exports.entrarSimulacion = function(peticion,respuesta){
 	var cadenaIdSimulacion = peticion.body.namePulsado;
 	peticion.session.idSimulacion = parseInt(cadenaIdSimulacion);
-	peticion.session.paso=0;
+	peticion.session.paso=-1;
 	peticion.session.fase=0;
 	var idSimulacion = peticion.session.idSimulacion;
 	var idUsuario = peticion.session.idUsuario;
-	//crea el paso0 para el jugador que se acaba de unir
-	var tableroString = JSON.stringify(funcionesExtra.dameTableroInicial());
-	ClaseAsync.series([function(retrollamada){fbd.dameCodigosEspecieBBDD(idUsuario,retrollamada)}],
-		function (err, resultados){
-			var paramMap = {"res":respuesta,"idSim":idSimulacion,"paso":0,"idUsu":idUsuario,
-			"tab":tableroString,"codM":resultados[0][0],"codH":resultados[0][1]};
-			ClaseAsync.series([function(retrollamada2){fbd.creaPasoUsuarioBBDD(paramMap,retrollamada2)},
-				function(retrollamada3){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada3)}],
-				function (err2, resultados2){
-					if(err){
-						funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err}));
-					}
-					else if(err2){
-						funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err2}));
-					}
-					else{
-						funcionesArchivos.leeArchivo( __dirname + "\\simulacionIni.html", fr.enviaListaEspeciesSimulacion.bind({respuesta: respuesta, listaEspecies:resultados2[1]}) );
-					}
-				}
-			);
+	ClaseAsync.series([		
+		function(retrollamada){creaPasoInicial(respuesta,idSimulacion,idUsuario,-1,retrollamada)},
+		function(retrollamada){fbd.dameListaEspeciesSimulacionBBDD(idSimulacion,retrollamada)}],
+	function (err, resultados){
+		if(err){
+			funcionesArchivos.leeArchivo(__dirname + "\\cuenta.html", fr.enviaMensaje.bind({respuesta: respuesta, mensaje:err}));
 		}
-	);	
+		else{
+			funcionesArchivos.leeArchivo( __dirname + "\\simulacionIni.html", fr.enviaListaEspeciesSimulacion.bind({respuesta: respuesta, listaEspecies:resultados[1]}) );
+		}
+	});	
 }
 
 var listarSimulaciones = module.exports.listarSimulaciones = function(peticion,respuesta){		

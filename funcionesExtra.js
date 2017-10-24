@@ -47,16 +47,14 @@ function dameCasillasAdyacentesDentroTablero(i1,j1,limiteSuperior){
 
 function dameIndividuo(idIndiv,indivaux){
 	var i=0;
-	var indiv = {};
 	var encontrado = false;
 	while(i<indivaux.length && !encontrado){
-		indiv = indivaux[i];
-		if(indiv.id==idIndiv){
-			encontrado=true;
+		if(indivaux[i].id==idIndiv){
+			return indivaux[i];
 		}
 		i++;
 	}
-	return indiv;
+	return null;
 }
 
 //-------------MOVER
@@ -243,6 +241,7 @@ function nacimientos(tablero,fecundaciones){
 		if(indivaux[i].decision=="S"){
 			var especiePadre = dameEspeciePadre(indivaux[i].id,fecundaciones);
 			if(especiePadre>=0){
+				actualizaFecundacion(i,-1,fecundaciones);//deshabilita la fecundacion, se entiende que ya pasa al nacimiento
 				var nuevoMacho = {"id":-1,"especie":-1,"sexo":"M","movimiento":"NO","decision":"","semilla":""};
 				var nuevaHembra = {"id":-1,"especie":-1,"sexo":"H","movimiento":"NO","decision":"N","semilla":""};
 				nuevaHembra.especie = especiePadre;
@@ -389,7 +388,7 @@ var dameTableroInicial = module.exports.dameTableroInicial = function (){
 	//{id:0,especie:0,sexo:"M",movimiento:"NO",decision:"N",semilla:""}
 	tablero.individuos=[{"id":0,"especie":0,"sexo":"M","movimiento":"SO","decision":"N","semilla":""},
 						{"id":1,"especie":0,"sexo":"H","movimiento":"SE","decision":"N","semilla":""},
-						{"id":2,"especie":1,"sexo":"M","movimiento":"O","decision":"N","semilla":""},
+						{"id":2,"especie":1,"sexo":"M","movimiento":"O","decision":"N","semilla":"Adios"},
 						{"id":3,"especie":1,"sexo":"H","movimiento":"NE","decision":"S","semilla":""}];
 	return tablero;
 }
