@@ -211,7 +211,7 @@ function ponIndividuoTablero(id,tablero){
 function dameEspeciePadre(idMadre,fecundaciones){
 	var idEspeciePadre = -1;
 	var encontrado = false;
-	var i;
+	var i=0;
 	while(i<fecundaciones.length && !encontrado){
 		if(fecundaciones[i].idmadre==idMadre){
 			idEspeciePadre=fecundaciones[i].especiepadre;
@@ -248,16 +248,18 @@ function nacimientos(tablero,fecundaciones){
 				nuevoMacho.especie = especiePadre;
 				nuevoMacho.id = cantidadIndivs;
 				ponIndividuoTablero(nuevoMacho.id,tablero);
+				creaFecundacion(cantidadIndivs,-1,fecundaciones);//crea una fecundacion inactiva
 				cantidadIndivs++;
 				nuevaHembra.id = cantidadIndivs;
 				ponIndividuoTablero(nuevaHembra.id,tablero);
+				creaFecundacion(cantidadIndivs,-1,fecundaciones);//crea una fecundacion inactiva
 				cantidadIndivs++;
 				nuevos.push(nuevoMacho);			
 				nuevos.push(nuevaHembra);
 			}			
 		}
 	}
-	indivaux=indivaux.concat(nuevos);
+	tablero.individuos=indivaux.concat(nuevos);
 }
 
 //-------------FECUNDAR
@@ -282,7 +284,10 @@ function dameHembrasAdyacentesNoFecundadas(i1,j1,idMacho,tablero,fecundadas){
 	}
 	return listaHembrasAdyacentes;
 }
-
+function creaFecundacion(idHembra,especieMacho,fecundaciones){
+	var nFecunds=fecundaciones.length;
+	fecundaciones[nFecunds]={idmadre:idHembra,especiepadre:especieMacho};
+}
 function actualizaFecundacion(idHembra,especieMacho,fecundaciones){
 	var i=0;
 	var encontrado = false;
@@ -353,7 +358,12 @@ var dameTableroActualizadoUsuario = module.exports.dameTableroActualizadoUsuario
 		var respuestaInd = {};//{id:"", movimiento:"", semilla:""}
 		respuestaInd.id=genteUnSexo[i].id;
 		respuestaInd.movimiento = peticion.body["m"+genteUnSexo[i].id];
-		respuestaInd.semilla = peticion.body[accion+genteUnSexo[i].id];
+		if(accion=="s"){
+			respuestaInd.semilla = peticion.body[accion+genteUnSexo[i].id];
+		}
+		else{
+			respuestaInd.decision = peticion.body[accion+genteUnSexo[i].id];
+		}
 		respuestasInds.push(respuestaInd);
 	}
 	var individuos = tablero.individuos;
@@ -391,6 +401,16 @@ var dameTableroInicial = module.exports.dameTableroInicial = function (){
 						{"id":2,"especie":1,"sexo":"M","movimiento":"O","decision":"N","semilla":"Adios"},
 						{"id":3,"especie":1,"sexo":"H","movimiento":"NE","decision":"S","semilla":""}];
 	return tablero;
+}
+
+var dameFecundacionesInactivasIniciales = module.exports.dameFecundacionesInactivasIniciales = function (tablero){
+	var fecundaciones = [];	
+	var indivaux = tablero.individuos;
+	var i;
+	for(i=0;i<indivaux.length;i++){
+		creaFecundacion(i,-1,fecundaciones);
+	}
+	return fecundaciones;
 }
 
 var movimientosNacimientos = module.exports.movimientosNacimientos = function(tablero,fecundaciones){

@@ -32,10 +32,16 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 		
 		//si es entrar en la simulacion
 		if(paso<0){
+			var tablaux;
 			for(i=0;i<listaEspeciesSimulacion.length;i++){	
 				var idUsuario = listaEspeciesSimulacion[i].ID_ESPECIE;
-				creaPasoInicial(respuesta,idSimulacion,idUsuario,0,function(){});	
+				tablaux=creaPasoInicial(respuesta,idSimulacion,idUsuario,0,function(){});	
 			}
+			fecundaciones = funcionesExtra.dameFecundacionesInactivasIniciales(tablaux);
+			for(i=0;i<fecundaciones.length;i++){
+				var fecundacion = fecundaciones[i];
+				fbd.actualizaFecundacionSimulacionBBDD(idSimulacion,fecundacion);
+			}	
 			fbd.incrementaPasoSimulacionBBDD(idSimulacion);
 			retrollamada();
 		}
@@ -91,7 +97,8 @@ function ejecutaPaso(respuesta, idSimulacion, paso, retrollamada){
 
 function creaPasoInicial(respuesta, idSimulacion, idUsuario, paso, retrollamadaParam){
 	//crea el paso0 para el jugador que se acaba de unir
-	var tableroString = JSON.stringify(funcionesExtra.dameTableroInicial());	
+	var tablero = funcionesExtra.dameTableroInicial();
+	var tableroString = JSON.stringify(tablero);	
 	ClaseAsync.series([function(retrollamada){fbd.dameCodigosEspecieBBDD(idUsuario,retrollamada)}],
 		function (err, resultados){
 			var paramMap = {"res":respuesta,"idSim":idSimulacion,"paso":paso,"idUsu":idUsuario,
@@ -111,6 +118,7 @@ function creaPasoInicial(respuesta, idSimulacion, idUsuario, paso, retrollamadaP
 			);
 		}
 	);
+	return tablero;
 }
 
 //------------------------PUBLICAS----------------------------------

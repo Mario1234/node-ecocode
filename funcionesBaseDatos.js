@@ -83,7 +83,7 @@ var subeCodigosUsuarioBBDD = module.exports.subeCodigosUsuarioBBDD = function(re
 
 var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respuesta, idUsuario){
 	var sqlite3 = require("sqlite3").verbose();
-	var consultaSQL = "SELECT nombre, contrasegna, codigo_macho, codigo_hembra FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
+	var consultaSQL = "SELECT nombre, contrasegna, CODIGO_MACHO, CODIGO_HEMBRA FROM USUARIO INNER JOIN CODIGOS_ESPECIE ON id=ID_ESPECIE WHERE id=?";
 	console.log(consultaSQL);
 	var baseDatos = new sqlite3.Database("miBaseDatos.db");	
 	baseDatos.serialize(function() {
@@ -97,8 +97,8 @@ var dameDatosUsuarioBBDD = module.exports.dameDatosUsuarioBBDD = function(respue
 				if(rows.length>0){
 					nom = rows[0].nombre;
 					con = rows[0].contrasegna;
-					codM = rows[0].codigo_macho;
-					codH = rows[0].codigo_hembra;
+					codM = rows[0].CODIGO_MACHO;
+					codH = rows[0].CODIGO_HEMBRA;
 				}
                 console.log(nom + ": " + con);
                 funcionesArchivos.leeArchivo(__dirname + "\\datos.html", fr.enviaDatos.bind({respuesta: respuesta, nom:nom, con:con, codM:codM, codH:codH}));
